@@ -30,6 +30,18 @@ https://blog.csdn.net/defi_wang/article/details/107936757
 |------|--------|
 |-v |Verbose mode to output more logs|
 |-y | Proceed the operation without any prompt |
+|-t | Specify the neutral network mode, please see the "neutral network" table|
+
+### *neutral network*
+|type|description|type|description|
+|------|--------|------|--------|
+|**LENET**|LeNet5|**RESNET18**|ResNet-18|
+|**VGGA**|VGG-A|**RESNET34**|ResNet-34|
+|**VGGA_LRN**|VGG-A LRN|**RESNET50**|ResNet-50|
+|**VGGB**|VGG-B|**RESNET101**|ResNet-101|
+|**VGGC**|VGG-C|**RESNET152**|ResNet-152|
+|**VGGD**|VGG-D|
+|**VGGE**|VGG-E|
 
 ## *arguments for command*
 ### **state**

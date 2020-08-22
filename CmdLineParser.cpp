@@ -36,15 +36,20 @@ const std::map<std::string, NN_TYPE, CaseInsensitiveComparator> CmdLineParser::m
 	{"VGGC",		NN_TYPE_VGGC},
 	{"VGGD",		NN_TYPE_VGGD},
 	{"VGGE",		NN_TYPE_VGGE},
+	{"RESNET18",	NN_TYPE_RESNET18},
+	{"RESNET34",	NN_TYPE_RESNET34},
+	{"RESNET50",	NN_TYPE_RESNET50},
+	{"RESNET101",	NN_TYPE_RESNET101},
+	{"RESNET152",	NN_TYPE_RESNET152},
 };
 
 COMMAND_OPTION CmdLineParser::options[] = {
 	{"verbose",			"v",		ODT_INTEGER,		"1",		&CmdLineParser::m_cmdLineParser.verbose,				false,	false},
 	{"quiet",			"y",		ODT_BOOLEAN,		"true",		&CmdLineParser::m_cmdLineParser.silence,				false,	false},
+	{"type",			"t",		ODT_NNTYPE,			"VGGD",		&CmdLineParser::m_cmdLineParser.nn_type,				false,	false},
 };
 
 COMMAND_OPTION CmdLineParser::cmd_flags[] = {
-	{"type",			"t",		ODT_INTEGER,		"5",		&CmdLineParser::m_cmdLineParser.nn_type,				false,	false},
 	{"batchsize",		"b",		ODT_INTEGER,		"1",		&CmdLineParser::m_cmdLineParser.batchsize,				false,	false},
 	{"epochnum",		"e",		ODT_INTEGER,		"1",		&CmdLineParser::m_cmdLineParser.epochnum,				false,	false},
 	{"learningrate",	"l",		ODT_FLOAT,			NULL,		&CmdLineParser::m_cmdLineParser.learningrate,			false,	false},
@@ -145,6 +150,18 @@ void CmdLineParser::parse_options(std::vector<int>& args, COMMAND_OPTION* option
 						strVal->assign(options_table[current_option_idx].default_value_str);
 					break;
 				}
+				case ODT_NNTYPE:
+				{
+					NN_TYPE nn_type = NN_TYPE_UNKNOWN;
+					if (options_table[current_option_idx].default_value_str != NULL)
+					{
+						auto iter = mapNNTypes.find(options_table[current_option_idx].default_value_str);
+						if (iter != mapNNTypes.cend())
+							nn_type = iter->second;
+					}
+
+					*((NN_TYPE*)options_table[current_option_idx].value_ref) = nn_type;
+				}
 				case ODT_LIST:
 					// Not implemented yet
 					break;
@@ -185,6 +202,13 @@ void CmdLineParser::parse_options(std::vector<int>& args, COMMAND_OPTION* option
 				std::string *strVal = (std::string*)options_table[current_option_idx].value_ref;
 				strVal->assign(szItem);
 				current_option_idx = -1;	// already consume the parameter
+				break;
+			}
+			case ODT_NNTYPE:
+			{
+				auto iter = mapNNTypes.find(szItem);
+				if (iter != mapNNTypes.cend())
+					*((NN_TYPE*)options_table[current_option_idx].value_ref) = iter->second;
 				break;
 			}
 			case ODT_LIST:

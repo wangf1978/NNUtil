@@ -16,40 +16,25 @@ using namespace Microsoft::WRL;
 using namespace torch::nn;
 using namespace std;
 
-#pragma once
 
-enum VGG_CONFIG
+enum RESNET_CONFIG
 {
-	VGG_UNKNOWN = -1,
-	VGG_A = 0,
-	VGG_A_BATCHNORM,
-	VGG_A_LRN,
-	VGG_A_LRN_BATCHNORM,
-	VGG_B,
-	VGG_B_BATCHNORM,
-	VGG_C,
-	VGG_C_BATCHNORM,
-	VGG_D,
-	VGG_D_BATCHNORM,
-	VGG_E,
-	VGG_E_BATCHNORM
+	RESNET_UNKNOWN = -1,
+	RESNET_18  = 0,
+	RESNET_34,
+	RESNET_50,
+	RESNET_101,
+	RESNET_152,
 };
 
-#define IS_BATCHNORM_ENABLED(c)	(\
-	((c) == VGG_A_BATCHNORM ||\
-	 (c) == VGG_A_LRN_BATCHNORM ||\
-	 (c) == VGG_B_BATCHNORM ||\
-	 (c) == VGG_C_BATCHNORM ||\
-	 (c) == VGG_D_BATCHNORM ||\
-	 (c) == VGG_E_BATCHNORM)?true:false)
-
-class VGGNet : public BaseNNet
+#pragma once
+class ResNet : public BaseNNet
 {
 public:
 	using tstring = std::basic_string<TCHAR, std::char_traits<TCHAR>, std::allocator<TCHAR>>;
 
-	VGGNet();
-	~VGGNet();
+	ResNet();
+	~ResNet();
 
 	int				train(
 						const char* szTrainSetRootPath, 
@@ -61,17 +46,16 @@ public:
 	void			verify(const char* szTrainSetRootPath, const char* szTrainSetStateFilePath);
 	void			classify(const char* szImageFile);
 
-	//
 	// Load and save net
-	//
-	int				loadnet(const char* szTrainSetStateFilePath);
 	int				savenet(const char* szTrainSetStateFilePath);
+	int				loadnet(const char* szTrainSetStateFilePath);
+	int				loadnet(RESNET_CONFIG config, int num_classes, bool use_32x32_input = false);
 	int				unloadnet();
 
 	void			Print();
 
 	// get the property
-	VGG_CONFIG		getcurrconfig() { return m_VGG_config; }
+	RESNET_CONFIG	getcurrconfig() { return m_RESNET_config; }
 	int				getnumclasses() { return m_num_classes; }
 	bool			isuse32x32input() { return m_use_32x32_input; }
 
@@ -82,11 +66,11 @@ protected:
 	std::vector<tstring>
 					m_image_labels;				// the image labels for this network
 	ImageProcess	m_imageprocessor;
-	bool			m_bEnableBatchNorm = true;
 	int				m_num_classes = 1000;
-	VGG_CONFIG		m_VGG_config;
+	RESNET_CONFIG	m_RESNET_config;
 	int				m_batch_size = 1;
 	bool			m_use_32x32_input = false;
 	bool			m_bInit = false;
 };
+
 

@@ -164,7 +164,7 @@
       <f module="FC38" />
     </forward>
   </nn>
-  <nn name="RestNet18">
+  <nn name="ResNet18" cat="ResNet">
     <modules>
       <module name="conv1"      type="conv2d" in_channels="3" out_channels="64" kernel_size="3" padding="3" stride="2" bias="false" />
       <module name="bn1"        type="batchnorm2d" num_features="64" />
@@ -177,7 +177,7 @@
       <!-- block#2-->
       <module name="conv_1_2_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
       <module name="btn_1_2_1"  type="batchnorm2d" num_features="64" />
-      <module name="conv_2_1_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="conv_1_2_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
       <module name="btn_1_2_2"  type="batchnorm2d" num_features="64" />
       <!-- layer#2 -->
       <!-- block#1 -->

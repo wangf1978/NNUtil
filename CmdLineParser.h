@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "util.h"
+#include "BaseNNet.h"
 
 enum NN_CMD
 {
@@ -19,18 +20,6 @@ enum NN_CMD
 	NN_CMD_VERIFY,
 	NN_CMD_CLASSIFY,
 	NN_CMD_TEST,
-};
-
-enum NN_TYPE
-{
-	NN_TYPE_UNKNOWN = -1,
-	NN_TYPE_LENET = 0,
-	NN_TYPE_VGGA,
-	NN_TYPE_VGGA_LRN,
-	NN_TYPE_VGGB,
-	NN_TYPE_VGGC,
-	NN_TYPE_VGGD,
-	NN_TYPE_VGGE,
 };
 
 struct CaseInsensitiveComparator
@@ -53,6 +42,7 @@ enum OPTION_DATA_TYPE
 	ODT_TIMEUNIT,
 	ODT_PRINTFMT,
 	ODT_SHOWREF,
+	ODT_NNTYPE,
 	ODT_LIST
 };
 

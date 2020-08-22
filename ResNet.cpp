@@ -1,4 +1,5 @@
-#include "VGGNet.h"
+#include "ResNet.h"
+
 #include <torch/nn/module.h>
 #include <iostream>
 #include <tuple>
@@ -11,39 +12,43 @@
 
 extern void FreeBlob(void* p);
 
-#define VGG_INPUT_IMG_WIDTH						224
-#define VGG_INPUT_IMG_HEIGHT					224
-#define VGG_TRAIN_BATCH_SIZE					64
+#define RESNET_INPUT_IMG_WIDTH					224
+#define RESNET_INPUT_IMG_HEIGHT					224
+#define RESNET_TRAIN_BATCH_SIZE					64
 
-std::map<VGG_CONFIG, std::string> _VGG_CONFIG_NAMES =
+std::map<RESNET_CONFIG, std::string> _RESNET_CONFIG_NAMES =
 {
-	{VGG_A,					"VGGA_NoBatchNorm"},
-	{VGG_A_BATCHNORM,		"VGGA_BatchNorm"},
-	{VGG_A_LRN,				"VGGA_LRN_NoBatchNorm"},
-	{VGG_A_LRN_BATCHNORM,	"VGGA_LRN_BatchNorm"},
-	{VGG_B,					"VGGB_NoBatchNorm"},
-	{VGG_B_BATCHNORM,		"VGGB_BatchNorm"},
-	{VGG_C,					"VGGC_NoBatchNorm"},
-	{VGG_C_BATCHNORM,		"VGGC_BatchNorm"},
-	{VGG_D,					"VGGD_NoBatchNorm"},
-	{VGG_D_BATCHNORM,		"VGGD_BatchNorm"},
-	{VGG_E,					"VGGD_NoBatchNorm"},
-	{VGG_E_BATCHNORM,		"VGGD_BatchNorm"},
+	{RESNET_18,				"RESNET18"},
+	{RESNET_34,				"RESNET34"},
+	{RESNET_50,				"RESNET50"},
+	{RESNET_101,			"RESNET101"},
+	{RESNET_152,			"RESNET152"}
 };
 
-VGGNet::VGGNet()
-	: m_VGG_config(VGG_UNKNOWN)
+ResNet::ResNet()
+	: m_RESNET_config(RESNET_UNKNOWN)
 	, m_num_classes(-1)
 	, m_use_32x32_input(false) {
 }
 
-VGGNet::~VGGNet()
+ResNet::~ResNet()
 {
 	m_imageprocessor.Uninit();
 	Uninit();
 }
 
-int VGGNet::_Init()
+int ResNet::loadnet(RESNET_CONFIG config, int num_classes, bool use_32x32_input)
+{
+	m_RESNET_config = config;
+	m_num_classes = num_classes;
+	m_use_32x32_input = use_32x32_input;
+
+	m_imageprocessor.Init(m_use_32x32_input ? 32 : RESNET_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : RESNET_INPUT_IMG_HEIGHT);
+
+	return _Init();
+}
+
+int ResNet::_Init()
 {
 	int iRet = -1;
 
@@ -53,14 +58,14 @@ int VGGNet::_Init()
 		return 0;
 	}
 
-	if (m_VGG_config == VGG_UNKNOWN)
+	if (m_RESNET_config == RESNET_UNKNOWN)
 	{
 		printf("Don't know the current net configuration.\n");
 		return -1;
 	}
 
-	auto iter = _VGG_CONFIG_NAMES.find(m_VGG_config);
-	if (iter != _VGG_CONFIG_NAMES.end())
+	auto iter = _RESNET_CONFIG_NAMES.find(m_RESNET_config);
+	if (iter != _RESNET_CONFIG_NAMES.end())
 	{
 		SetOptions({
 			{"NN::final_out_classes", std::to_string(m_num_classes) },
@@ -75,9 +80,9 @@ int VGGNet::_Init()
 	return iRet;
 }
 
-int VGGNet::unloadnet()
+int ResNet::unloadnet()
 {
-	m_VGG_config = VGG_UNKNOWN;
+	m_RESNET_config = RESNET_UNKNOWN;
 	m_num_classes = -1;
 	m_use_32x32_input = false;
 
@@ -86,14 +91,14 @@ int VGGNet::unloadnet()
 	return Uninit();
 }
 
-int VGGNet::train(const char* szImageSetRootPath, 
+int ResNet::train(const char* szImageSetRootPath,
 	const char* szTrainSetStateFilePath,
 	int batch_size,
 	int num_epoch,
 	float learning_rate,
 	unsigned int showloss_per_num_of_batches)
 {
-	TCHAR szImageFile[MAX_PATH] = {0};
+	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name classname/picture_file_name
 	std::vector<tstring> train_image_files;
 	std::vector<tstring> train_image_labels;
@@ -102,6 +107,9 @@ int VGGNet::train(const char* szImageSetRootPath,
 	auto tm_end = tm_start;
 	TCHAR szDirPath[MAX_PATH] = { 0 };
 	TCHAR* tszImageSetRootPath = NULL;
+
+	if (_Init() != 0)
+		return -1;
 
 	// Convert UTF-8 to Unicode
 #ifdef _UNICODE
@@ -131,11 +139,11 @@ int VGGNet::train(const char* szImageSetRootPath,
 	//auto optimizer = torch::optim::SGD(parameters(), torch::optim::SGDOptions(0.001).momentum(0.9));
 	auto optimizer = torch::optim::SGD(parameters(), torch::optim::SGDOptions(lr).momentum(0.9));
 	tm_end = std::chrono::system_clock::now();
-	printf("It takes %lld msec to prepare training classifying cats and dogs.\n", 
+	printf("It takes %lld msec to prepare training classifying cats and dogs.\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 
 	tm_start = std::chrono::system_clock::now();
-	
+
 	torch::Tensor tensor_input;
 	for (int64_t epoch = 1; epoch <= (int64_t)num_epoch; ++epoch)
 	{
@@ -168,9 +176,9 @@ int VGGNet::train(const char* szImageSetRootPath,
 		}
 
 		// Take the image shuffle
-		for(size_t i = 0;i<(train_image_shuffle_set.size() + batch_size -1)/ batch_size;i++)
+		for (size_t i = 0; i < (train_image_shuffle_set.size() + batch_size - 1) / batch_size; i++)
 		{
-			std::vector<VGGNet::tstring> image_batches;
+			std::vector<ResNet::tstring> image_batches;
 			std::vector<long long> label_batches;
 
 			for (int b = 0; b < batch_size; b++)
@@ -203,7 +211,7 @@ int VGGNet::train(const char* szImageSetRootPath,
 
 			if (image_batches.size() == 0)
 				continue;
-			
+
 			if (m_imageprocessor.ToTensor(image_batches, tensor_input) != 0)
 				continue;
 
@@ -254,7 +262,7 @@ int VGGNet::train(const char* szImageSetRootPath,
 
 	tm_end = std::chrono::system_clock::now();
 	long long train_duration = std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count();
-	printf("It took %lldh:%02dm:%02d.%03ds to finish training VGG network!\n",
+	printf("It took %lldh:%02dm:%02d.%03ds to finish training RESNET network!\n",
 		train_duration / 1000 / 3600,
 		(int)(train_duration / 1000 / 60 % 60),
 		(int)(train_duration / 1000 % 60),
@@ -266,7 +274,7 @@ int VGGNet::train(const char* szImageSetRootPath,
 	return 0;
 }
 
-void VGGNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetStateFilePath)
+void ResNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetStateFilePath)
 {
 	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name with the format 'classname/picture_file_name'
@@ -312,18 +320,18 @@ void VGGNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetSta
 	}
 
 	tm_end = std::chrono::system_clock::now();
-	printf("It took %lld msec to load the test images/labels set.\n", 
+	printf("It took %lld msec to load the test images/labels set.\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 	tm_start = std::chrono::system_clock::now();
 
 	if (loadnet(szPreTrainSetStateFilePath) != 0)
 	{
-		printf("Failed to load the pre-trained VGG network from %s.\n", szPreTrainSetStateFilePath);
+		printf("Failed to load the pre-trained %s network from %s.\n", szPreTrainSetStateFilePath, nnname().c_str());
 		return;
 	}
 
 	tm_end = std::chrono::system_clock::now();
-	printf("It took %lld msec to load the pre-trained network state.\n", 
+	printf("It took %lld msec to load the pre-trained network state.\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 	tm_start = std::chrono::system_clock::now();
 
@@ -340,7 +348,7 @@ void VGGNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetSta
 
 		size_t label = 0;
 		for (label = 0; label < m_image_labels.size(); label++)
-			if (_tcsnicmp(m_image_labels[label].c_str(), 
+			if (_tcsnicmp(m_image_labels[label].c_str(),
 				cszImgFilePath, (pszTmp - cszImgFilePath) / sizeof(TCHAR)) == 0)
 				break;
 
@@ -390,7 +398,7 @@ void VGGNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetSta
 		(int)(verify_duration % 1000));
 }
 
-void VGGNet::classify(const char* cszImageFile)
+void ResNet::classify(const char* cszImageFile)
 {
 	auto tm_start = std::chrono::system_clock::now();
 	auto tm_end = tm_start;
@@ -420,11 +428,11 @@ void VGGNet::classify(const char* cszImageFile)
 	tm_end = std::chrono::system_clock::now();
 
 	_tprintf(_T("This image seems to %s, cost %lld msec.\n"),
-		m_image_labels.size() > std::get<1>(predicted).item<int>()?m_image_labels[std::get<1>(predicted).item<int>()].c_str():_T("Unknown"),
+		m_image_labels.size() > std::get<1>(predicted).item<int>() ? m_image_labels[std::get<1>(predicted).item<int>()].c_str() : _T("Unknown"),
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 }
 
-int VGGNet::savenet(const char* szTrainSetStateFilePath)
+int ResNet::savenet(const char* szTrainSetStateFilePath)
 {
 	// Save the net state to xxxx.pt and save the labels to xxxx.pt.label
 	char szLabel[MAX_LABEL_NAME] = { 0 };
@@ -442,17 +450,17 @@ int VGGNet::savenet(const char* szTrainSetStateFilePath)
 			label_list.emplace_back((const char*)szLabel);
 		}
 		torch::IValue value(label_list);
-		archive.write("VGG_labels", label_list);
+		archive.write("RESNET_labels", label_list);
 
 		// also save the current network configuration
 		torch::IValue valNumClass(m_num_classes);
-		archive.write("VGG_num_of_class", valNumClass);
+		archive.write("RESNET_num_of_class", valNumClass);
 
-		torch::IValue valNetConfig((int64_t)m_VGG_config);
-		archive.write("VGG_config", valNetConfig);
+		torch::IValue valNetConfig((int64_t)m_RESNET_config);
+		archive.write("RESNET_config", valNetConfig);
 
 		torch::IValue valUseSmallSize(m_use_32x32_input);
-		archive.write("VGG_use_32x32_input", valUseSmallSize);
+		archive.write("RESNET_use_32x32_input", valUseSmallSize);
 
 		save(archive);
 
@@ -460,7 +468,7 @@ int VGGNet::savenet(const char* szTrainSetStateFilePath)
 	}
 	catch (...)
 	{
-		printf("Failed to save the trained VGG net state.\n");
+		printf("Failed to save the trained %s net state.\n", nnname().c_str());
 		return -1;
 	}
 	printf("Save the training result to %s.\n", szTrainSetStateFilePath);
@@ -468,7 +476,7 @@ int VGGNet::savenet(const char* szTrainSetStateFilePath)
 	return 0;
 }
 
-int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
+int ResNet::loadnet(const char* szPreTrainSetStateFilePath)
 {
 	wchar_t szLabel[MAX_LABEL_NAME] = { 0 };
 
@@ -478,15 +486,14 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 	int64_t NN_use_32x32_input = int64_from_options("NN::use_32x32_input");
 
 	// if the pre-trained neutral network state file is not specified
-	VGG_CONFIG config = VGG_UNKNOWN;
+	RESNET_CONFIG config = RESNET_UNKNOWN;
 	switch (nn_type)
 	{
-	case NN_TYPE_VGGA: config = NN_enable_batch_norm ? VGG_A_BATCHNORM : VGG_A; break;
-	case NN_TYPE_VGGA_LRN: config = NN_enable_batch_norm ? VGG_A_LRN_BATCHNORM : VGG_A_LRN; break;
-	case NN_TYPE_VGGB: config = NN_enable_batch_norm ? VGG_B_BATCHNORM : VGG_B; break;
-	case NN_TYPE_VGGC: config = NN_enable_batch_norm ? VGG_C_BATCHNORM : VGG_C; break;
-	case NN_TYPE_VGGD: config = NN_enable_batch_norm ? VGG_D_BATCHNORM : VGG_D; break;
-	case NN_TYPE_VGGE: config = NN_enable_batch_norm ? VGG_E_BATCHNORM : VGG_E; break;
+	case NN_TYPE_RESNET18:  config = RESNET_18; break;
+	case NN_TYPE_RESNET34:  config = RESNET_34; break;
+	case NN_TYPE_RESNET50:  config = RESNET_50; break;
+	case NN_TYPE_RESNET101: config = RESNET_101; break;
+	case NN_TYPE_RESNET152: config = RESNET_152; break;
 	}
 
 	if (szPreTrainSetStateFilePath == NULL)
@@ -494,14 +501,14 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 		if (nn_type == NN_TYPE_UNKNOWN || NN_final_out_classes <= 0)
 			return -1;
 
-		if (config == VGG_UNKNOWN)
-			m_VGG_config = NN_enable_batch_norm ? VGG_D_BATCHNORM : VGG_D;
+		if (config == RESNET_UNKNOWN)
+			m_RESNET_config = RESNET_18;
 		else
-			m_VGG_config = config;
+			m_RESNET_config = config;
 		m_num_classes = NN_final_out_classes;
 		m_use_32x32_input = NN_use_32x32_input ? true : false;
 
-		m_imageprocessor.Init(m_use_32x32_input ? 32 : VGG_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : VGG_INPUT_IMG_HEIGHT);
+		m_imageprocessor.Init(m_use_32x32_input ? 32 : RESNET_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : RESNET_INPUT_IMG_HEIGHT);
 
 		return _Init();
 	}
@@ -513,7 +520,7 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 		archive.load_from(szPreTrainSetStateFilePath);
 
 		torch::IValue value;
-		if (archive.try_read("VGG_labels", value) && value.isList())
+		if (archive.try_read("RESNET_labels", value) && value.isList())
 		{
 			auto& label_list = value.toListRef();
 			for (size_t i = 0; i < label_list.size(); i++)
@@ -529,30 +536,29 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 			}
 		}
 
-		archive.read("VGG_num_of_class", value);
+		archive.read("RESNET_num_of_class", value);
 		m_num_classes = (int)value.toInt();
 
-		archive.read("VGG_config", value);
-		m_VGG_config = (VGG_CONFIG)value.toInt();
-		m_bEnableBatchNorm = IS_BATCHNORM_ENABLED(m_VGG_config);
+		archive.read("RESNET_config", value);
+		m_RESNET_config = (RESNET_CONFIG)value.toInt();
 
-		archive.read("VGG_use_32x32_input", value);
+		archive.read("RESNET_use_32x32_input", value);
 		m_use_32x32_input = value.toBool();
 
 		// Check the previous neutral network config is the same with current specified parameters
-		if (config != VGG_UNKNOWN && config != m_VGG_config ||
+		if (config != RESNET_UNKNOWN && config != m_RESNET_config ||
 			NN_final_out_classes > 0 && NN_final_out_classes != m_num_classes ||
 			NN_use_32x32_input != -1 && (bool)NN_use_32x32_input != m_use_32x32_input)
 		{
 			printf("==========================================================================\n");
 			printf("The pre-trained network config is different with the specified parameters:\n");
-			if (config != VGG_UNKNOWN && config != m_VGG_config)
+			if (config != RESNET_UNKNOWN && config != m_RESNET_config)
 			{
-				auto iter1 = _VGG_CONFIG_NAMES.find(m_VGG_config);
-				auto iter2 = _VGG_CONFIG_NAMES.find(config);
+				auto iter1 = _RESNET_CONFIG_NAMES.find(m_RESNET_config);
+				auto iter2 = _RESNET_CONFIG_NAMES.find(config);
 				printf("\tcurrent config: %s, the specified config: %s\n",
-					iter1 != _VGG_CONFIG_NAMES.end() ? iter1->second.c_str() : "Unknown",
-					iter2 != _VGG_CONFIG_NAMES.end() ? iter2->second.c_str() : "Unknown");
+					iter1 != _RESNET_CONFIG_NAMES.end() ? iter1->second.c_str() : "Unknown",
+					iter2 != _RESNET_CONFIG_NAMES.end() ? iter2->second.c_str() : "Unknown");
 			}
 
 			if (NN_final_out_classes > 0 && NN_final_out_classes != m_num_classes)
@@ -565,13 +571,13 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 			printf("Continue using the network config in the pre-train net state...\n");
 		}
 
-		m_imageprocessor.Init(m_use_32x32_input ? 32 : VGG_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : VGG_INPUT_IMG_HEIGHT);
+		m_imageprocessor.Init(m_use_32x32_input ? 32 : RESNET_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : RESNET_INPUT_IMG_HEIGHT);
 
 		// Construct network layout,weight layers and so on
 		if (_Init() < 0)
 		{
 			printf("Failed to initialize the current network {num_of_classes: %d, VGG config: %d, use_32x32_input: %s}.\n",
-				m_num_classes, m_VGG_config, m_use_32x32_input?"yes":"no");
+				m_num_classes, m_RESNET_config, m_use_32x32_input ? "yes" : "no");
 			return -1;
 		}
 
@@ -580,20 +586,22 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 	}
 	catch (...)
 	{
-		printf("Failed to load the pre-trained VGG net state.\n");
+		printf("Failed to load the pre-trained %s net state.\n", nnname().c_str());
 		return -1;
 	}
 
 	return 0;
 }
 
-void VGGNet::Print()
+void ResNet::Print()
 {
-	auto iter = _VGG_CONFIG_NAMES.find(m_VGG_config);
-	if (iter != _VGG_CONFIG_NAMES.end())
+	auto iter = _RESNET_CONFIG_NAMES.find(m_RESNET_config);
+	if (iter != _RESNET_CONFIG_NAMES.end())
 		printf("Neutral Network: %s\n", iter->second.c_str());
 
-	printf("Enable Batch Normal: %s\n", m_bEnableBatchNorm?"yes":"no");
+	printf("Enable Batch Normal: yes\n");
+	printf("Use small input size 32x32: %s\n", m_use_32x32_input?"yes":"no");
+	printf("number of output classes: %d\n", m_num_classes);
 
 	BaseNNet::Print();
 }

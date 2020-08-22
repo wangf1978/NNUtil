@@ -33,6 +33,9 @@
     <ClCompile Include="VGGNet.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ResNet.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CmdLineParser.h">
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="VGGNet.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ResNet.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

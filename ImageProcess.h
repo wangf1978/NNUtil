@@ -37,6 +37,19 @@ public:
 	HRESULT			ToTensor(std::vector<tstring> strImageFiles, torch::Tensor& tensor);
 	void			Uninit();
 
+	// 
+	// Data set management
+	// 
+	// load image sets and labels
+	HRESULT			loadImageSet(const TCHAR* szImageSetRootPath,
+						std::vector<tstring>& image_files,
+						std::vector<tstring>& image_labels,
+						bool bTrainSet = true, bool bShuffle = true);
+	HRESULT			loadLabels(const TCHAR* szImageSetRootPath, std::vector<tstring>& image_labels);
+
+	//
+	// Utility functions
+	//
 	static void		SaveAs(ComPtr<IWICBitmap>& bitmap, PCWSTR filename);
 
 protected:

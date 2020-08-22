@@ -8,9 +8,9 @@
 #include <io.h>
 
 #include "VGGNet.h"
+#include "ResNet.h"
 #include "ImageProcess.h"
 #include "CmdLineParser.h"
-#include "BaseNNet.h"
 
 extern std::map<VGG_CONFIG, std::string> _VGG_CONFIG_NAMES;
 
@@ -153,28 +153,45 @@ int _tmain(int argc, const TCHAR* argv[])
 		return -1;
 	}
 
+	BaseNNet* ptrNet = nullptr;
 	CmdLineParser& ctxCmd = CmdLineParser::GetCmdLineParser();
-	VGG_CONFIG config = ctxCmd.enable_batch_norm ? VGG_D_BATCHNORM : VGG_D;
-	switch (ctxCmd.nn_type)
+
+	if (ctxCmd.nn_type >= NN_TYPE_VGGA && ctxCmd.nn_type <= NN_TYPE_VGGE)
 	{
-	case NN_TYPE_VGGA: config = ctxCmd.enable_batch_norm ? VGG_A_BATCHNORM : VGG_A; break;
-	case NN_TYPE_VGGA_LRN: config = ctxCmd.enable_batch_norm ? VGG_A_LRN_BATCHNORM : VGG_A_LRN; break;
-	case NN_TYPE_VGGB: config = ctxCmd.enable_batch_norm ? VGG_B_BATCHNORM : VGG_B; break;
-	case NN_TYPE_VGGC: config = ctxCmd.enable_batch_norm ? VGG_C_BATCHNORM : VGG_C; break;
-	case NN_TYPE_VGGD: config = ctxCmd.enable_batch_norm ? VGG_D_BATCHNORM : VGG_D; break;
-	case NN_TYPE_VGGE: config = ctxCmd.enable_batch_norm ? VGG_E_BATCHNORM : VGG_E; break;
+		ptrNet = new VGGNet();
+	}
+	else if (ctxCmd.nn_type >= NN_TYPE_RESNET18 && ctxCmd.nn_type <= NN_TYPE_RESNET152)
+	{
+		ptrNet = new ResNet();
+
+	}
+	else
+	{
+		freeargv(argc, (char**)u8argv);
+		printf("Unsupported neutral network model is specified!\n");
+		return -1;
 	}
 
-	VGGNet vgg_net;
 	switch (ctxCmd.cmd)
 	{
 	case NN_CMD_STATE:
 	{
 		std::cout << torch::show_config() << '\n';
-		if (_access(ctxCmd.train_net_state_path.c_str(), 0) == 0 && vgg_net.loadnet(ctxCmd.train_net_state_path.c_str()) == 0)
-			vgg_net.Print();
-		else if (vgg_net.loadnet(config, ctxCmd.num_classes, ctxCmd.use_32x32_input) == 0)
-			vgg_net.Print();
+		// load the pre-trained net and show its information
+		if (_access(ctxCmd.train_net_state_path.c_str(), 0) == 0 && ptrNet->loadnet(ctxCmd.train_net_state_path.c_str()) == 0)
+			ptrNet->Print();
+		else
+		{
+			ptrNet->SetOptions({
+					{"NN::nn_type", std::to_string((int)ctxCmd.nn_type)},
+					{"NN::enable_batch_norm", std::to_string(ctxCmd.enable_batch_norm?1:0)},
+					{"NN::final_out_classes", std::to_string(ctxCmd.num_classes) },
+					{"NN::use_32x32_input", std::to_string(ctxCmd.use_32x32_input ? 1 : 0) },
+				});
+
+			if (ptrNet->loadnet(nullptr) == 0)
+				ptrNet->Print();
+		}
 	}
 	break;
 	case NN_CMD_TRAIN:
@@ -198,42 +215,32 @@ int _tmain(int argc, const TCHAR* argv[])
 		// Try to load the net from the pre-trained file if it exist
 		if (_access(ctxCmd.train_net_state_path.c_str(), 0) == 0)
 		{
-			if (vgg_net.loadnet(ctxCmd.train_net_state_path.c_str()) != 0)
+			if (ptrNet->loadnet(ctxCmd.train_net_state_path.c_str()) != 0)
 				printf("Failed to load the VGG network from %s, retraining the VGG net.\n", ctxCmd.train_net_state_path.c_str());
 			else
-			{
-				// Check the previous neutral network config is the same with current specified parameters
-				if (config != vgg_net.getcurrconfig() ||
-					ctxCmd.num_classes != vgg_net.getnumclasses() ||
-					ctxCmd.use_32x32_input != vgg_net.isuse32x32input())
-				{
-					printf("The pre-trained network config is different with the specified parameters:\n");
-					auto iter1 = _VGG_CONFIG_NAMES.find(vgg_net.getcurrconfig());
-					auto iter2 = _VGG_CONFIG_NAMES.find(config);
-					printf("\tcurrent config: %s, the specified config: %s\n",
-						iter1 != _VGG_CONFIG_NAMES.end() ? iter1->second.c_str() : "Unknown",
-						iter2 != _VGG_CONFIG_NAMES.end() ? iter2->second.c_str() : "Unknown");
-					printf("\tcurrent numclass: %d, the specified numclass: %d\n", vgg_net.getnumclasses(), ctxCmd.num_classes);
-					printf("\tcurrent use_32x32_input: %s, the specified use_32x32_input: %s\n",
-						vgg_net.isuse32x32input() ? "yes" : "no", ctxCmd.use_32x32_input ? "yes" : "no");
-					printf("Continue using the network config in the pre-train net state...\n");
-				}
-
 				bLoadSucc = true;
-			}
 		}
 
 		// Failed to load net from the previous trained net, retrain the net
-		if (bLoadSucc == false && vgg_net.loadnet(config, ctxCmd.num_classes, ctxCmd.use_32x32_input) != 0)
+		if (bLoadSucc == false)
 		{
-			printf("Failed to load the neutral network.\n");
-			goto done;
+			ptrNet->SetOptions({
+					{"NN::nn_type", std::to_string((int)ctxCmd.nn_type)},
+					{"NN::enable_batch_norm", std::to_string(ctxCmd.enable_batch_norm ? 1 : 0)},
+					{"NN::final_out_classes", std::to_string(ctxCmd.num_classes) },
+					{"NN::use_32x32_input", std::to_string(ctxCmd.use_32x32_input ? 1 : 0) },
+				});
+
+			if (ptrNet->loadnet(NULL) != 0)
+			{
+				printf("Failed to load the neutral network.\n");
+				goto done;
+			}
 		}
 
 		tm_end = std::chrono::system_clock::now();
 
 		{
-			auto iter_config = _VGG_CONFIG_NAMES.find(vgg_net.getcurrconfig());
 			long long load_duration =
 				std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count();
 			printf("It took %lldh:%02dm:%02d.%03ds msec to construct the '%s' network.\n",
@@ -241,11 +248,11 @@ int _tmain(int argc, const TCHAR* argv[])
 				(int)(load_duration / 1000 / 60 % 60),
 				(int)(load_duration / 1000 % 60),
 				(int)(load_duration % 1000),
-				iter_config != _VGG_CONFIG_NAMES.end() ? iter_config->second.c_str() : "Unknown");
+				ptrNet->nnname().c_str());
 			tm_start = std::chrono::system_clock::now();
 		}
 
-		vgg_net.train(ctxCmd.image_set_root_path.c_str(),
+		ptrNet->train(ctxCmd.image_set_root_path.c_str(),
 			ctxCmd.train_net_state_path.c_str(),
 			ctxCmd.batchsize,
 			ctxCmd.epochnum,
@@ -261,7 +268,7 @@ int _tmain(int argc, const TCHAR* argv[])
 			goto done;
 		}
 
-		vgg_net.verify(ctxCmd.image_set_root_path.c_str(), ctxCmd.train_net_state_path.c_str());
+		ptrNet->verify(ctxCmd.image_set_root_path.c_str(), ctxCmd.train_net_state_path.c_str());
 	}
 	break;
 	case NN_CMD_CLASSIFY:
@@ -272,13 +279,13 @@ int _tmain(int argc, const TCHAR* argv[])
 			goto done;
 		}
 
-		if (vgg_net.loadnet(ctxCmd.train_net_state_path.c_str()) != 0)
+		if (ptrNet->loadnet(ctxCmd.train_net_state_path.c_str()) != 0)
 		{
 			printf("Failed to load the VGG network from %s.\n", ctxCmd.train_net_state_path.c_str());
 			goto done;
 		}
 
-		vgg_net.classify(ctxCmd.image_path.c_str());
+		ptrNet->classify(ctxCmd.image_path.c_str());
 	}
 	break;
 	case NN_CMD_TEST:
@@ -292,6 +299,9 @@ int _tmain(int argc, const TCHAR* argv[])
 	}
 
 done:
+	if (ptrNet != nullptr)
+		delete ptrNet;
+
 	CoUninitialize();
 
 	freeargv(argc, (char**)u8argv);

@@ -154,8 +154,8 @@ HRESULT ImageProcess::ToTensor(const TCHAR* cszImageFile, torch::Tensor& tensor)
 	UINT outHeight = m_outHeight;
 	WICPixelFormatGUID pixelFormat;
 	unsigned char* pBGRABuf = m_pBGRABuf;
-	D2D1_RECT_F dst_rect = { 0, 0, outWidth, outHeight };
-	WICRect rect = { 0, 0, outWidth, outHeight };
+	D2D1_RECT_F dst_rect = { 0, 0, (FLOAT)outWidth, (FLOAT)outHeight };
+	WICRect rect = { 0, 0, (INT)outWidth, (INT)outHeight };
 
 	if (cszImageFile == NULL || _taccess(cszImageFile, 0) != 0)
 		return E_INVALIDARG;
@@ -258,9 +258,9 @@ HRESULT ImageProcess::ToTensor(const TCHAR* cszImageFile, torch::Tensor& tensor)
 	float* res_data = (float*)malloc(3 * outWidth * outHeight * sizeof(float));
 	for (int c = 0; c < 3; c++)
 	{
-		for (int i = 0; i < outHeight; i++)
+		for (UINT i = 0; i < outHeight; i++)
 		{
-			for (int j = 0; j < outWidth; j++)
+			for (UINT j = 0; j < outWidth; j++)
 			{
 				int pos = c * outWidth*outHeight + i * outWidth + j;
 				res_data[pos] = ((pBGRABuf[i * outWidth * 4 + j * 4 + 2 - c]) / 255.0f - m_RGB_means[c]) / m_RGB_stds[c];
@@ -301,8 +301,8 @@ HRESULT ImageProcess::ToTensor(std::vector<tstring> strImageFiles, torch::Tensor
 	UINT outHeight = m_outHeight;
 	WICPixelFormatGUID pixelFormat;
 	unsigned char* pBGRABuf = m_pBGRABuf;
-	D2D1_RECT_F dst_rect = { 0, 0, outWidth, outHeight };
-	WICRect rect = { 0, 0, outWidth, outHeight };
+	D2D1_RECT_F dst_rect = { 0, 0, (FLOAT)outWidth, (FLOAT)outHeight };
+	WICRect rect = { 0, 0, (INT)outWidth, (INT)outHeight };
 	wchar_t wszImageFile[MAX_PATH + 1] = { 0 };
 	const wchar_t* wszInputFile = NULL;
 	float* res_data = NULL;
@@ -320,7 +320,7 @@ HRESULT ImageProcess::ToTensor(std::vector<tstring> strImageFiles, torch::Tensor
 
 	for (size_t b = 0; b < strImageFiles.size(); b++)
 	{
-		int pos = 0;
+		size_t pos = 0;
 		BOOL bDynamic = FALSE;
 #ifndef _UNICODE
 		if (MultiByteToWideChar(CP_UTF8, 0, strImageFiles[b].c_str(), -1, wszImageFile, MAX_PATH + 1) == 0)
@@ -424,11 +424,11 @@ HRESULT ImageProcess::ToTensor(std::vector<tstring> strImageFiles, torch::Tensor
 		pos = b * 3 * outWidth*outHeight;
 		for (int c = 0; c < 3; c++)
 		{
-			for (int i = 0; i < outHeight; i++)
+			for (UINT i = 0; i < outHeight; i++)
 			{
-				for (int j = 0; j < outWidth; j++)
+				for (UINT j = 0; j < outWidth; j++)
 				{
-					int cpos = pos + c * outWidth*outHeight + i * outWidth + j;
+					size_t cpos = pos + c * outWidth*outHeight + i * outWidth + j;
 					res_data[cpos] = ((pBGRABuf[i * outWidth * 4 + j * 4 + 2 - c]) / 255.0f - m_RGB_means[c]) / m_RGB_stds[c];
 				}
 			}
@@ -536,4 +536,135 @@ void ImageProcess::SaveAs(ComPtr<IWICBitmap>& bitmap, PCWSTR filename)
 
 done:
 	return;
+}
+
+HRESULT ImageProcess::loadImageSet(
+	const TCHAR* szRootPath,				// the root path to place training_set or test_set folder
+	std::vector<tstring>& image_files,		// the image files to be trained or tested
+	std::vector<tstring>& image_labels,		// the image label
+	bool bTrainSet, bool bShuffle)
+{
+	HRESULT hr = S_OK;
+	TCHAR szDirPath[MAX_PATH] = { 0 };
+	TCHAR szImageFile[MAX_PATH] = { 0 };
+
+	_tcscpy_s(szDirPath, MAX_PATH, szRootPath);
+	size_t ccDirPath = _tcslen(szRootPath);
+	if (szDirPath[ccDirPath - 1] == _T('\\'))
+		szDirPath[ccDirPath - 1] = _T('\0');
+
+	_stprintf_s(szImageFile, MAX_PATH, _T("%s\\%s\\*.*"),
+		szDirPath, bTrainSet ? _T("training_set") : _T("test_set"));
+
+	// Find all image file names under the train set, 2 level
+	WIN32_FIND_DATA find_data;
+	HANDLE hFind = FindFirstFile(szImageFile, &find_data);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return E_FAIL;
+
+	do {
+		if (!(find_data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY) ||
+			_tcsicmp(find_data.cFileName, _T(".")) == 0 ||
+			_tcsicmp(find_data.cFileName, _T("..")) == 0)
+			continue;
+
+		WIN32_FIND_DATA image_find_data;
+		_stprintf_s(szImageFile, MAX_PATH, _T("%s\\%s\\%s\\*.*"),
+			szDirPath, bTrainSet ? _T("training_set") : _T("test_set"), find_data.cFileName);
+
+		BOOL bHaveTrainImages = FALSE;
+		HANDLE hImgFind = FindFirstFile(szImageFile, &image_find_data);
+		if (hImgFind == INVALID_HANDLE_VALUE)
+			continue;
+
+		do
+		{
+			if (image_find_data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)
+				continue;
+
+			// check whether it is a supported image file
+			const TCHAR* szTmp = _tcsrchr(image_find_data.cFileName, _T('.'));
+			if (szTmp && (_tcsicmp(szTmp, _T(".jpg")) == 0 ||
+				_tcsicmp(szTmp, _T(".png")) == 0 ||
+				_tcsicmp(szTmp, _T(".jpeg")) == 0))
+			{
+				// reuse szImageFile
+				_stprintf_s(szImageFile, _T("%s\\%s"), find_data.cFileName, image_find_data.cFileName);
+				image_files.emplace_back(szImageFile);
+				if (bHaveTrainImages == FALSE)
+				{
+					bHaveTrainImages = TRUE;
+					image_labels.emplace_back(find_data.cFileName);
+				}
+			}
+
+		} while (FindNextFile(hImgFind, &image_find_data));
+
+		FindClose(hImgFind);
+
+	} while (FindNextFile(hFind, &find_data));
+
+	FindClose(hFind);
+
+	return hr;
+}
+
+HRESULT ImageProcess::loadLabels(const TCHAR* szImageSetRootPath, std::vector<tstring>& image_labels)
+{
+	HRESULT hr = S_OK;
+	TCHAR szDirPath[MAX_PATH] = { 0 };
+	TCHAR szImageFile[MAX_PATH] = { 0 };
+
+	_tcscpy_s(szDirPath, MAX_PATH, szImageSetRootPath);
+	size_t ccDirPath = _tcslen(szImageSetRootPath);
+	if (szDirPath[ccDirPath - 1] == _T('\\'))
+		szDirPath[ccDirPath - 1] = _T('\0');
+
+	_stprintf_s(szImageFile, MAX_PATH, _T("%s\\training_set\\*.*"), szDirPath);
+
+	// Find all image file names under the train set, 2 level
+	WIN32_FIND_DATA find_data;
+	HANDLE hFind = FindFirstFile(szImageFile, &find_data);
+	if (hFind == INVALID_HANDLE_VALUE)
+		return E_FAIL;
+
+	do {
+		if (!(find_data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY))
+			continue;
+
+		WIN32_FIND_DATA image_find_data;
+		_stprintf_s(szImageFile, MAX_PATH, _T("%s\\training_set\\%s\\*.*"), szDirPath, find_data.cFileName);
+
+		BOOL bHaveTrainImages = FALSE;
+		HANDLE hImgFind = FindFirstFile(szImageFile, &image_find_data);
+		if (hImgFind == INVALID_HANDLE_VALUE)
+			continue;
+
+		do
+		{
+			if (image_find_data.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)
+				continue;
+
+			// check whether it is a supported image file
+			const TCHAR* szTmp = _tcsrchr(image_find_data.cFileName, _T('.'));
+			if (szTmp && (_tcsicmp(szTmp, _T(".jpg")) == 0 ||
+				_tcsicmp(szTmp, _T(".png")) == 0 ||
+				_tcsicmp(szTmp, _T(".jpeg")) == 0))
+			{
+				bHaveTrainImages = TRUE;
+				break;
+			}
+
+		} while (FindNextFile(hImgFind, &image_find_data));
+
+		if (bHaveTrainImages)
+			image_labels.emplace_back(find_data.cFileName);
+
+		FindClose(hImgFind);
+
+	} while (FindNextFile(hFind, &find_data));
+
+	FindClose(hFind);
+
+	return S_OK;
 }

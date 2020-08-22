@@ -96,6 +96,7 @@
     <ClCompile Include="CmdLineParser.cpp" />
     <ClCompile Include="ImageProcess.cpp" />
     <ClCompile Include="NNUtil.cpp" />
+    <ClCompile Include="ResNet.cpp" />
     <ClCompile Include="tinyxml2.cpp" />
     <ClCompile Include="VGGNet.cpp" />
   </ItemGroup>
@@ -104,6 +105,7 @@
     <ClInclude Include="CmdLineParser.h" />
     <ClInclude Include="ImageProcess.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="ResNet.h" />
     <ClInclude Include="tinyxml2.h" />
     <ClInclude Include="util.h" />
     <ClInclude Include="VGGNet.h" />

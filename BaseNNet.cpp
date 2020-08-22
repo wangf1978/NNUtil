@@ -59,6 +59,34 @@ int BaseNNet::SetOptions(NNetOptions options)
 	return 0;
 }
 
+NN_TYPE BaseNNet::nntype_from_options()
+{
+	NN_TYPE nn_type = NN_TYPE_UNKNOWN;
+	std::string* ptr_str_nn_type = nn_options.find("NN::nn_type");
+	if (ptr_str_nn_type != NULL)
+	{
+		int64_t val_nn_type = -1;
+		if (ConvertToInt((char*)ptr_str_nn_type->c_str(),
+			(char*)ptr_str_nn_type->c_str() + ptr_str_nn_type->length(), val_nn_type))
+			nn_type = (NN_TYPE)val_nn_type;
+	}
+
+	return nn_type;
+}
+
+int64_t	BaseNNet::int64_from_options(const char* key)
+{
+	int64_t val = -1;
+	std::string* ptr_str_numclass = nn_options.find(key);
+	if (ptr_str_numclass != NULL)
+	{
+		ConvertToInt((char*)ptr_str_numclass->c_str(),
+			(char*)ptr_str_numclass->c_str() + ptr_str_numclass->length(), val);
+	}
+
+	return val;
+}
+
 int BaseNNet::Init(const char* szNNName)
 {
 	int iRet = 0;
@@ -404,10 +432,11 @@ int BaseNNet::LoadModule(tinyxml2::XMLElement* moduleElement)
 		int64_t in_channels = moduleElement->Int64Attribute("in_channels", -1LL); assert(in_channels > 0);
 		int64_t out_channels = moduleElement->Int64Attribute("out_channels", -1LL); assert(out_channels > 0);
 		int64_t kernel_size = moduleElement->Int64Attribute("kernel_size", -1LL); assert(kernel_size > 0);
-		int64_t padding = moduleElement->Int64Attribute("padding", 1LL);
+		int64_t padding = moduleElement->Int64Attribute("padding", 0LL);
+		bool bias = moduleElement->BoolAttribute("bias", true);
 
 		std::shared_ptr<torch::nn::Module> spConv2D = 
-			std::make_shared<torch::nn::Conv2dImpl>(torch::nn::Conv2dOptions(in_channels, out_channels, kernel_size).padding(padding));
+			std::make_shared<torch::nn::Conv2dImpl>(torch::nn::Conv2dOptions(in_channels, out_channels, kernel_size).padding(padding).bias(bias));
 		nn_modules[szModuleName] = spConv2D;
 		nn_module_types[szModuleName] = szModuleType;
 		register_module(szModuleName, spConv2D);
@@ -473,7 +502,7 @@ int BaseNNet::LoadModule(tinyxml2::XMLElement* moduleElement)
 		nn_module_types[szModuleName] = szModuleType;
 		register_module(szModuleName, spBatchNorm2D);
 	}
-	else if (XP_STRICMP(szModuleName, "adaptiveavgpool2d") == 0)
+	else if (XP_STRICMP(szModuleType, "adaptiveavgpool2d") == 0)
 	{
 		int64_t outputsize = moduleElement->Int64Attribute("outputsize", -1); assert(outputsize > 0);
 
