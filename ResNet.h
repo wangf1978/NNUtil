@@ -38,18 +38,21 @@ public:
 
 	int				train(
 						const char* szTrainSetRootPath, 
+						IMGSET_TYPE img_type,
 						const char* szTrainSetStateFilePath,
+						LearningRateMgr* pLRMgr,
 						int batch_size = 1, 
 						int num_epoch = 1,
-						float learning_rate = -1.0f,
-						unsigned int showloss_per_num_of_batches = 10);
-	void			verify(const char* szTrainSetRootPath, const char* szTrainSetStateFilePath);
+						unsigned int showloss_per_num_of_batches = 10,
+						double weight_decay = NAN,
+						double momentum = NAN,
+						OPTIM_TYPE optim_type = OPTIM_SGD);
+	void			verify(const char* szTrainSetRootPath);
 	void			classify(const char* szImageFile);
 
 	// Load and save net
 	int				savenet(const char* szTrainSetStateFilePath);
 	int				loadnet(const char* szTrainSetStateFilePath);
-	int				loadnet(RESNET_CONFIG config, int num_classes, bool use_32x32_input = false);
 	int				unloadnet();
 
 	void			Print();

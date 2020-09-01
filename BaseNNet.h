@@ -4,6 +4,8 @@
 #include "tinyxml2.h"
 #include <map>
 #include <vector>
+#include "LearningRateMgr.h"
+#include "ImageProcess.h"
 
 using namespace torch::nn;
 
@@ -26,6 +28,24 @@ enum NN_TYPE
 	NN_TYPE_RESNET152,
 };
 
+enum OPTIM_TYPE
+{
+	OPTIM_UNKNOWN = -1,
+	OPTIM_SGD = 0,
+	OPTIM_Adam,
+	OPTIM_AdamW,
+	OPTIM_LBFGS,
+	OPTIM_RMSprop,
+	OPTIM_Adagrad,
+};
+
+#define OPTIM_NAME(o)	((o) == OPTIM_SGD?"SGD":(\
+						 (o) == OPTIM_Adam?"Adam":(\
+						 (o) == OPTIM_AdamW?"AdamW":(\
+						 (o) == OPTIM_LBFGS?"LBFGS":(\
+						 (o) == OPTIM_RMSprop?"RMSprop":(\
+						 (o) == OPTIM_Adagrad?"Adagrad":"Unknown"))))))
+
 #define MAX_LABEL_NAME		2048
 
 class BaseNNet: public Module
@@ -36,12 +56,16 @@ public:
 	int Uninit();
 
 	virtual int train(const char* szTrainSetRootPath, 
+					  IMGSET_TYPE img_type,
 					  const char* szTrainSetStateFilePath,
+					  LearningRateMgr* pLRMgr,
 					  int batch_size = 1, 
 					  int num_epoch = 1,
-					  float learning_rate = -1.0f,
-					  unsigned int showloss_per_num_of_batches = 10) = 0;
-	virtual void verify(const char* szTrainSetRootPath, const char* szTrainSetStateFilePath) = 0;
+					  unsigned int showloss_per_num_of_batches = 10,
+					  double weight_decay = NAN,
+					  double momentum = NAN,
+					  OPTIM_TYPE optim_type = OPTIM_SGD) = 0;
+	virtual void verify(const char* szTrainSetRootPath) = 0;
 	virtual void classify(const char* szImageFile) = 0;
 	virtual void Print();
 
@@ -62,7 +86,7 @@ protected:
 	bool _forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor& input, torch::Tensor& out);
 
 	NN_TYPE nntype_from_options();
-	int64_t	int64_from_options(const char* key);
+	int64_t	int64_from_options(const char* key, int64_t def = -1);
 
 protected:
 	std::map<std::string, std::shared_ptr<torch::nn::Module>> nn_modules;

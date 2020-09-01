@@ -74,9 +74,9 @@ NN_TYPE BaseNNet::nntype_from_options()
 	return nn_type;
 }
 
-int64_t	BaseNNet::int64_from_options(const char* key)
+int64_t	BaseNNet::int64_from_options(const char* key, int64_t def)
 {
-	int64_t val = -1;
+	int64_t val = def;
 	std::string* ptr_str_numclass = nn_options.find(key);
 	if (ptr_str_numclass != NULL)
 	{
@@ -221,14 +221,14 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 			do
 			{
 				if (branch == NULL ||
-					branch->NoChildren() ||
-					branch->FirstChildElement("f") == NULL)
+					branch->NoChildren())
 					continue;
 
 				if (first_branch == true)
 				{
 					if (_forward(branch->FirstChildElement(), x, out))
 					{
+						//std::cout << out.sizes() << '\n';
 						bTensorHasProcessed = true;
 						first_branch = false;
 					}
@@ -243,7 +243,15 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 					{
 						torch::Tensor tensor_ret;
 						if (_forward(branch->FirstChildElement(), x, tensor_ret))
+						{
+							//std::cout << tensor_ret.sizes() << '\n';
 							out += tensor_ret;
+							if (branch->BoolAttribute("debug"))
+							{
+								std::cout << out << std::endl;
+								abort();
+							}
+						}
 						else
 						{
 							printf("Failed to process the branch: parallel/branch, line number: %d.\n", branch->GetLineNum());
@@ -269,6 +277,11 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 					{
 						auto spConv2d = std::dynamic_pointer_cast<torch::nn::Conv2dImpl>(m->second);
 						out = spConv2d->forward(bTensorHasProcessed ? out : input);
+						if (f->BoolAttribute("debug"))
+						{
+							std::cout << szModuleName << out << std::endl;
+							abort();
+						}
 						bTensorHasProcessed = true;
 						continue;
 					}
@@ -276,6 +289,11 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 					{
 						auto spLinear = std::dynamic_pointer_cast<torch::nn::LinearImpl>(m->second);
 						out = spLinear->forward(bTensorHasProcessed ? out : input);
+						if (f->BoolAttribute("debug"))
+						{
+							std::cout << szModuleName << out << std::endl;
+							abort();
+						}
 						bTensorHasProcessed = true;
 						continue;
 					}
@@ -283,6 +301,24 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 					{
 						auto spBatchNorm2d = std::dynamic_pointer_cast<torch::nn::BatchNorm2dImpl>(m->second);
 						out = spBatchNorm2d->forward(bTensorHasProcessed ? out : input);
+						if (f->BoolAttribute("debug"))
+						{
+							std::cout << szModuleName << out << std::endl;
+							abort();
+						}
+						bTensorHasProcessed = true;
+						continue;
+					}
+					else if (module_type == "adaptiveavgpool2d")
+					{
+						auto spAdaptiveAvgPool2d = std::dynamic_pointer_cast<torch::nn::AdaptiveAvgPool2dImpl>(m->second);
+						out = spAdaptiveAvgPool2d->forward(bTensorHasProcessed ? out : input);
+						if (f->BoolAttribute("debug"))
+						{
+							std::cout << szModuleName << out << std::endl;
+							abort();
+						}
+						//std::cout << out.sizes() << '\n';
 						bTensorHasProcessed = true;
 						continue;
 					}
@@ -300,6 +336,11 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 				{
 					bool inplace = f->BoolAttribute("inplace", false);
 					out = F::relu(bTensorHasProcessed ? out : input, F::ReLUFuncOptions(inplace));
+					if (f->BoolAttribute("debug"))
+					{
+						std::cout << out << '\n';
+						abort();
+					}
 					bTensorHasProcessed = true;
 					continue;
 				}
@@ -309,6 +350,11 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 					int64_t stride = f->Int64Attribute("stride", kernel_size);
 					int64_t padding = f->Int64Attribute("padding", 0);
 					out = F::max_pool2d(bTensorHasProcessed ? out : input, F::MaxPool2dFuncOptions(kernel_size).stride(stride).padding(padding));
+					if (f->BoolAttribute("debug"))
+					{
+						std::cout << out << '\n';
+						abort();
+					}
 					bTensorHasProcessed = true;
 					continue;
 				}
@@ -323,12 +369,14 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 				else if (XP_STRICMP(szFunctional, "adaptive_avg_pool2d") == 0)
 				{
 					// At present, only support square kernel size
-					int64_t output_size = f->Int64Attribute("output_size", -1LL);
-					if (output_size <= 0)
+					int64_t outputsize = f->Int64Attribute("outputsize", -1LL);
+					if (outputsize <= 0)
 						printf("Invalid output size is specified for adaptive_avg_pool2d.\n");
 					else
 					{
-						out = F::adaptive_avg_pool2d(bTensorHasProcessed ? out : input, F::AdaptiveAvgPool2dFuncOptions({ output_size, output_size }));
+						//std::cout << "avgpool input:\n" << out << '\n';
+						out = F::adaptive_avg_pool2d(bTensorHasProcessed ? out : input, F::AdaptiveAvgPool2dFuncOptions({ outputsize, outputsize }));
+						//std::cout << "avgpool output:\n" << out << '\n';
 						bTensorHasProcessed = true;
 					}
 
@@ -347,11 +395,20 @@ bool BaseNNet::_forward(tinyxml2::XMLElement* first_sibling, const torch::Tensor
 						out = out.view({ out.size(0), -1 });
 					else
 						out = input.view({ input.size(0), -1 });
+					//std::cout << out.sizes() << '\n';
 					continue;
 				}
 			}
 			else
 				printf("Unsupported functional {line number: %d}.\n", f->GetLineNum());
+		}
+		else if (XP_STRICMP(sibling->Name(), "identity") == 0)
+		{
+			if (!bTensorHasProcessed)
+			{
+				out = input;
+				bTensorHasProcessed = true;
+			}
 		}
 		else
 		{
@@ -391,6 +448,16 @@ torch::Tensor BaseNNet::forward(torch::Tensor& input)
 				input = spLinear->forward(input);
 				continue;
 			}
+			else if (m->name() == "torch::nn::AdaptiveAvgPool2dImpl")
+			{
+				auto spAdaptiveAvgPool2d = std::dynamic_pointer_cast<torch::nn::AdaptiveAvgPool2dImpl>(m);
+				input = spAdaptiveAvgPool2d->forward(input);
+				continue;
+			}
+			else
+			{
+				printf("Unsupported module '%s'.\n", m->name().c_str());
+			}
 		}
 
 		return input;
@@ -398,7 +465,6 @@ torch::Tensor BaseNNet::forward(torch::Tensor& input)
 
 	// travel
 	torch::Tensor out;
-
 
 	if (_forward(flow_start->FirstChildElement(), input, out))
 		return out;
@@ -432,11 +498,46 @@ int BaseNNet::LoadModule(tinyxml2::XMLElement* moduleElement)
 		int64_t in_channels = moduleElement->Int64Attribute("in_channels", -1LL); assert(in_channels > 0);
 		int64_t out_channels = moduleElement->Int64Attribute("out_channels", -1LL); assert(out_channels > 0);
 		int64_t kernel_size = moduleElement->Int64Attribute("kernel_size", -1LL); assert(kernel_size > 0);
+		int64_t stride = moduleElement->Int64Attribute("stride", 1LL); assert(stride > 0);
 		int64_t padding = moduleElement->Int64Attribute("padding", 0LL);
 		bool bias = moduleElement->BoolAttribute("bias", true);
 
+		if (nn_cat == "ResNet")
+		{
+			// check whether it is the first full connect layer
+			bool bHaveExistedConvLayer = false;
+			for (auto& t : nn_module_types) {
+				if (t.second == "conv2d")
+				{
+					bHaveExistedConvLayer = true;
+					break;
+				}
+			}
+
+			if (!bHaveExistedConvLayer)
+			{
+				auto use_32x32_input = nn_options.find("NN::use_32x32_input");
+				if (use_32x32_input != nullptr)
+				{
+					int64_t b_use_32x32_input = 0;
+					if (ConvertToInt((char*)use_32x32_input->c_str(), (char*)use_32x32_input->c_str() + use_32x32_input->length(), b_use_32x32_input))
+					{
+						printf("Change the neutral network to use small image size: %s.\n", b_use_32x32_input ? "yes" : "no");
+						if (b_use_32x32_input)
+						{
+							kernel_size = 3;
+							padding = 1;
+							stride = 1;
+						}
+					}
+				}
+			}
+		}
+
+
 		std::shared_ptr<torch::nn::Module> spConv2D = 
-			std::make_shared<torch::nn::Conv2dImpl>(torch::nn::Conv2dOptions(in_channels, out_channels, kernel_size).padding(padding).bias(bias));
+			std::make_shared<torch::nn::Conv2dImpl>(
+				torch::nn::Conv2dOptions(in_channels, out_channels, kernel_size).padding(padding).stride(stride).bias(bias));
 		nn_modules[szModuleName] = spConv2D;
 		nn_module_types[szModuleName] = szModuleType;
 		register_module(szModuleName, spConv2D);

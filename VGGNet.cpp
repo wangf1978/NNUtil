@@ -15,6 +15,9 @@ extern void FreeBlob(void* p);
 #define VGG_INPUT_IMG_HEIGHT					224
 #define VGG_TRAIN_BATCH_SIZE					64
 
+#define VGG_DEFAULT_WEIGHT_DECAY				0.0005
+#define VGG_DEFAULT_MOMENTUM					0.9
+
 std::map<VGG_CONFIG, std::string> _VGG_CONFIG_NAMES =
 {
 	{VGG_A,					"VGGA_NoBatchNorm"},
@@ -87,11 +90,15 @@ int VGGNet::unloadnet()
 }
 
 int VGGNet::train(const char* szImageSetRootPath, 
+	IMGSET_TYPE img_type,
 	const char* szTrainSetStateFilePath,
+	LearningRateMgr* pLRMgr,
 	int batch_size,
 	int num_epoch,
-	float learning_rate,
-	unsigned int showloss_per_num_of_batches)
+	unsigned int showloss_per_num_of_batches,
+	double weight_decay,
+	double momentum,
+	OPTIM_TYPE optim_type)
 {
 	TCHAR szImageFile[MAX_PATH] = {0};
 	// store the file name classname/picture_file_name
@@ -124,12 +131,35 @@ int VGGNet::train(const char* szImageSetRootPath,
 		return -1;
 	}
 
+	m_imageprocessor.SetImageTransformMode((ImageTransformMode)(IMG_TM_PADDING_RESIZE | IMG_TM_RANDOM_CROP | IMG_TM_CENTER_CROP | IMG_TM_RANDOM_HORIZONTAL_FLIPPING));
+
 	batch_size = batch_size < 0 ? 1 : batch_size;
 
-	double lr = learning_rate > 0.f ? (double)learning_rate : 0.01;
+	double lr = pLRMgr->GetLearningRate();
+	double wd = isnan(weight_decay) ? VGG_DEFAULT_WEIGHT_DECAY : weight_decay;
+	double m = isnan(momentum) ? VGG_DEFAULT_MOMENTUM : momentum;
+	ImageTransformMode image_tm = m_imageprocessor.GetImageTransformMode();
+
+	printf("=======================================================================\n");
+	printf("Image train-set enhancement:\n");
+	printf("\trandom padding_resize: %s\n", (image_tm&IMG_TM_PADDING_RESIZE) ? "enable" : "disable");
+	printf("\trandom throughout resize: %s\n", (image_tm&IMG_TM_RESIZE) ? "enable" : "disable");
+	printf("\trandom crop: %s\n", (image_tm&IMG_TM_RANDOM_CROP) ? "enable" : "disable");
+	printf("\trandom center crop: %s\n", (image_tm&IMG_TM_CENTER_CROP) ? "enable" : "disable");
+	printf("\trandom horizontal flipping: %s\n", (image_tm&IMG_TM_RANDOM_HORIZONTAL_FLIPPING) ? "enable" : "disable");
+	printf("optimizer: %s\n", OPTIM_NAME(optim_type));
+	printf("weight decay: %s\n", doublecompactstring(wd).c_str());
+	printf("momentum: %s\n", doublecompactstring(m).c_str());
+	printf("learning rate: %s\n", doublecompactstring(lr).c_str());
+	printf("batch size: %d\n", batch_size);
+	printf("=======================================================================\n");
+
 	auto criterion = torch::nn::CrossEntropyLoss();
-	//auto optimizer = torch::optim::SGD(parameters(), torch::optim::SGDOptions(0.001).momentum(0.9));
-	auto optimizer = torch::optim::SGD(parameters(), torch::optim::SGDOptions(lr).momentum(0.9));
+	torch::optim::Optimizer* optimizer = NULL;
+	if (optim_type == OPTIM_Adam)
+		optimizer = new torch::optim::Adam(parameters(), torch::optim::AdamOptions(lr).weight_decay(wd));
+	else
+		optimizer = new torch::optim::SGD(parameters(), torch::optim::SGDOptions(lr).momentum(m).weight_decay(wd));
 	tm_end = std::chrono::system_clock::now();
 	printf("It takes %lld msec to prepare training classifying cats and dogs.\n", 
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
@@ -140,6 +170,7 @@ int VGGNet::train(const char* szImageSetRootPath,
 	for (int64_t epoch = 1; epoch <= (int64_t)num_epoch; ++epoch)
 	{
 		auto running_loss = 0.;
+		auto epoch_loss = 0.;
 		size_t totals = 0;
 
 		// Shuffle the list
@@ -155,9 +186,10 @@ int VGGNet::train(const char* szImageSetRootPath,
 		}
 
 		// dynamic learning rate if no learning rate is specified
-		if (learning_rate <= 0.f)
+		if (lr != pLRMgr->GetLearningRate())
 		{
-			for (auto& pg : optimizer.param_groups())
+			lr = pLRMgr->GetLearningRate();
+			for (auto& pg : optimizer->param_groups())
 			{
 				if (pg.has_options())
 				{
@@ -215,7 +247,7 @@ int VGGNet::train(const char* szImageSetRootPath,
 
 			totals += label_batches.size();
 
-			optimizer.zero_grad();
+			optimizer->zero_grad();
 			// 喂数据给网络
 			auto outputs = forward(tensor_input);
 
@@ -228,9 +260,13 @@ int VGGNet::train(const char* szImageSetRootPath,
 			auto loss = criterion(outputs, tensor_label);
 			// 反馈给网络，调整权重参数进一步优化
 			loss.backward();
-			optimizer.step();
+			optimizer->step();
 
 			running_loss += loss.item().toFloat();
+			epoch_loss += loss.item().toFloat();
+
+			pLRMgr->OnTrainStepFinish(loss.item().toFloat());
+
 			if (showloss_per_num_of_batches > 0 && ((i + 1) % showloss_per_num_of_batches == 0))
 			{
 				printf("[%lld, %5zu] loss: %.3f\n", epoch, i + 1, running_loss / showloss_per_num_of_batches);
@@ -238,17 +274,10 @@ int VGGNet::train(const char* szImageSetRootPath,
 			}
 		}
 
-		// Adjust the learning rate dynamically
-		if (learning_rate <= 0.f)
-		{
-			if (epoch % 2 == 0)
-			{
-				lr = lr * 0.1;
-				if (lr < 0.00001)
-					lr = 0.00001;
-			}
-		}
+		pLRMgr->OnTrainEpochFinish();
 	}
+
+	m_imageprocessor.SetImageTransformMode(IMG_TM_PADDING_RESIZE);
 
 	printf("Finish training!\n");
 
@@ -263,10 +292,12 @@ int VGGNet::train(const char* szImageSetRootPath,
 	m_image_labels = train_image_labels;
 	savenet(szTrainSetStateFilePath);
 
+	delete optimizer;
+
 	return 0;
 }
 
-void VGGNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetStateFilePath)
+void VGGNet::verify(const char* szImageSetRootPath)
 {
 	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name with the format 'classname/picture_file_name'
@@ -315,12 +346,6 @@ void VGGNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetSta
 	printf("It took %lld msec to load the test images/labels set.\n", 
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 	tm_start = std::chrono::system_clock::now();
-
-	if (loadnet(szPreTrainSetStateFilePath) != 0)
-	{
-		printf("Failed to load the pre-trained VGG network from %s.\n", szPreTrainSetStateFilePath);
-		return;
-	}
 
 	tm_end = std::chrono::system_clock::now();
 	printf("It took %lld msec to load the pre-trained network state.\n", 
@@ -503,7 +528,41 @@ int VGGNet::loadnet(const char* szPreTrainSetStateFilePath)
 
 		m_imageprocessor.Init(m_use_32x32_input ? 32 : VGG_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : VGG_INPUT_IMG_HEIGHT);
 
-		return _Init();
+		int iRet = -1;
+		if ((iRet = _Init()) == 0)
+		{
+#if 0
+			for (auto& m : modules(false))
+			{
+				if (m->name() == "torch::nn::Conv2dImpl")
+				{
+					printf("init the conv2d parameters.\n");
+					auto spConv2d = std::dynamic_pointer_cast<torch::nn::Conv2dImpl>(m);
+					spConv2d->reset_parameters();
+					torch::nn::init::xavier_normal_(spConv2d->weight);
+
+					//torch::nn::init::kaiming_normal_(spConv2d->weight, 0.0, torch::kFanOut, torch::kReLU);
+					//torch::nn::init::constant_(spConv2d->weight, 1);
+					if (spConv2d->options.bias())
+						torch::nn::init::zeros_(spConv2d->bias);
+				}
+				else if (m->name() == "torch::nn::BatchNorm2dImpl")
+				{
+					printf("init the batchnorm2d parameters.\n");
+					auto spBatchNorm2d = std::dynamic_pointer_cast<torch::nn::BatchNorm2dImpl>(m);
+					torch::nn::init::constant_(spBatchNorm2d->weight, 1);
+					torch::nn::init::constant_(spBatchNorm2d->bias, 0);
+				}
+				//else if (m->name() == "torch::nn::LinearImpl")
+				//{
+				//	auto spLinear = std::dynamic_pointer_cast<torch::nn::LinearImpl>(m);
+				//	torch::nn::init::constant_(spLinear->weight, 1);
+				//	torch::nn::init::constant_(spLinear->bias, 0);
+				//}
+			}
+#endif
+		}
+		return iRet;
 	}
 
 	try

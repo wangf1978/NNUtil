@@ -1,5 +1,433 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <nns>
+  <nn name="VGGA_NoBatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="conv_1_1"  type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <!-- Block#2 -->
+      <module name="conv_2_1"  type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <!-- Block#3 -->
+      <module name="conv_3_1"  type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="conv_3_2"  type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <!-- Block#4 -->
+      <module name="conv_4_1"  type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_4_2"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <!-- Block#5 -->
+      <module name="conv_5_1"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_5_2"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <!-- FC -->
+      <module name="fc1"       type="linear" in_features="25088" out_features="4096" />
+      <module name="fc2"       type="linear" in_features="4096"  out_features="4096" />
+      <module name="fc3"       type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="conv_1_1" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_2_1" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_3_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_4_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_5_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="fc1" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc2" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc3" />
+    </forward>
+  </nn>
+  <nn name="VGGA_BatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="conv_1_1"   type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="btn_1_1"    type="batchnorm2d" num_features="64" />
+      <!-- Block#2 -->
+      <module name="conv_2_1"   type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="btn_2_1"    type="batchnorm2d" num_features="128" />
+      <!-- Block#3 -->
+      <module name="conv_3_1"   type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="btn_3_1"    type="batchnorm2d" num_features="256" />
+      <module name="conv_3_2"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="btn_3_2"    type="batchnorm2d" num_features="256" />
+      <!-- Block#4 -->
+      <module name="conv_4_1"   type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_4_1"    type="batchnorm2d" num_features="512" />
+      <module name="conv_4_2"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_4_2"    type="batchnorm2d" num_features="512" />
+      <!-- Block#5 -->
+      <module name="conv_5_1"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_5_1"    type="batchnorm2d" num_features="512" />
+      <module name="conv_5_2"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_5_2"    type="batchnorm2d" num_features="512" />
+      <!-- FC -->
+      <module name="fc1"        type="linear" in_features="25088" out_features="4096" />
+      <module name="fc2"        type="linear" in_features="4096"  out_features="4096" />
+      <module name="fc3"        type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="conv_1_1" />
+      <f module="btn_1_1" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_2_1" />
+      <f module="btn_2_1" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_3_1" />
+      <f module="btn_3_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_2" />
+      <f module="btn_3_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_4_1" />
+      <f module="btn_4_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_2" />
+      <f module="btn_4_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="conv_5_1" />
+      <f module="btn_5_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_2" />
+      <f module="btn_5_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="fc1" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc2" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc3" />
+    </forward>
+  </nn>
+  <nn name="VGGB_NoBatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="C1"  type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="C3"  type="conv2d" in_channels="64"  out_channels="64"  kernel_size="3" padding="1" />
+      <!-- Block#2 -->
+      <module name="C6"  type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="C8"  type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" />
+      <!-- Block#3 -->
+      <module name="C11" type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C13" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <!-- Block#4 -->
+      <module name="C18" type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C20" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <!-- Block#5 -->
+      <module name="C25" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C27" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <!-- FC -->
+      <module name="FC32" type="linear" in_features="25088" out_features="4096" />
+      <module name="FC35" type="linear" in_features="4096"  out_features="4096" />
+      <module name="FC38" type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="C1" />
+      <f functional="relu" inplace="true" />
+      <f module="C3" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C6" />
+      <f functional="relu" inplace="true" />
+      <f module="C8" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C11" />
+      <f functional="relu" inplace="true" />
+      <f module="C13" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C18" />
+      <f functional="relu" inplace="true" />
+      <f module="C20" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C25" />
+      <f functional="relu" inplace="true" />
+      <f module="C27" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="FC32" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC35" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC38" />
+    </forward>
+  </nn>
+  <nn name="VGGB_BatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="C1"   type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="C1B"  type="batchnorm2d" num_features="64" />
+      <module name="C3"   type="conv2d" in_channels="64"  out_channels="64"  kernel_size="3" padding="1" />
+      <module name="C3B"  type="batchnorm2d" num_features="64" />
+      <!-- Block#2 -->
+      <module name="C6"   type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="C6B"  type="batchnorm2d" num_features="128" />
+      <module name="C8"   type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" />
+      <module name="C8B"  type="batchnorm2d" num_features="128" />
+      <!-- Block#3 -->
+      <module name="C11"  type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C11B" type="batchnorm2d" num_features="256" />
+      <module name="C13"  type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C13B" type="batchnorm2d" num_features="256" />
+      <!-- Block#4 -->
+      <module name="C18"  type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C18B" type="batchnorm2d" num_features="512" />
+      <module name="C20"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C20B" type="batchnorm2d" num_features="512" />
+      <!-- Block#5 -->
+      <module name="C25"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C25B" type="batchnorm2d" num_features="512" />
+      <module name="C27"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C27B" type="batchnorm2d" num_features="512" />
+      <!-- FC -->
+      <module name="FC32" type="linear" in_features="25088" out_features="4096" />
+      <module name="FC35" type="linear" in_features="4096"  out_features="4096" />
+      <module name="FC38" type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="C1" />
+      <f module="C1B" />
+      <f functional="relu" inplace="true" />
+      <f module="C3" />
+      <f module="C3B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C6" />
+      <f module="C6B" />
+      <f functional="relu" inplace="true" />
+      <f module="C8" />
+      <f module="C8B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C11" />
+      <f module="C11B" />
+      <f functional="relu" inplace="true" />
+      <f module="C13" />
+      <f module="C13B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C18" />
+      <f module="C18B" />
+      <f functional="relu" inplace="true" />
+      <f module="C20" />
+      <f module="C20B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C25" />
+      <f module="C25B" />
+      <f functional="relu" inplace="true" />
+      <f module="C27" />
+      <f module="C27B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="FC32" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC35" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC38" />
+    </forward>
+  </nn>
+  <nn name="VGGC_NoBatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="C1"  type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="C3"  type="conv2d" in_channels="64"  out_channels="64"  kernel_size="3" padding="1" />
+      <!-- Block#2 -->
+      <module name="C6"  type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="C8"  type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" />
+      <!-- Block#3 -->
+      <module name="C11" type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C13" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C15" type="conv2d" in_channels="256" out_channels="256" kernel_size="1" padding="1" />
+      <!-- Block#4 -->
+      <module name="C18" type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C20" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C22" type="conv2d" in_channels="512" out_channels="512" kernel_size="1" padding="1" />
+      <!-- Block#5 -->
+      <module name="C25" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C27" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C29" type="conv2d" in_channels="512" out_channels="512" kernel_size="1" padding="1" />
+      <!-- FC -->
+      <module name="FC32" type="linear" in_features="25088" out_features="4096" />
+      <module name="FC35" type="linear" in_features="4096"  out_features="4096" />
+      <module name="FC38" type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="C1" />
+      <f functional="relu" inplace="true" />
+      <f module="C3" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C6" />
+      <f functional="relu" inplace="true" />
+      <f module="C8" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C11" />
+      <f functional="relu" inplace="true" />
+      <f module="C13" />
+      <f functional="relu" inplace="true" />
+      <f module="C15" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C18" />
+      <f functional="relu" inplace="true" />
+      <f module="C20" />
+      <f functional="relu" inplace="true" />
+      <f module="C22" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C25" />
+      <f functional="relu" inplace="true" />
+      <f module="C27" />
+      <f functional="relu" inplace="true" />
+      <f module="C29" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="FC32" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC35" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC38" />
+    </forward>
+  </nn>
+  <nn name="VGGC_BatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="C1"   type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="C1B"  type="batchnorm2d" num_features="64" />
+      <module name="C3"   type="conv2d" in_channels="64"  out_channels="64"  kernel_size="3" padding="1" />
+      <module name="C3B"  type="batchnorm2d" num_features="64" />
+      <!-- Block#2 -->
+      <module name="C6"   type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="C6B"  type="batchnorm2d" num_features="128" />
+      <module name="C8"   type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" />
+      <module name="C8B"  type="batchnorm2d" num_features="128" />
+      <!-- Block#3 -->
+      <module name="C11"  type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C11B" type="batchnorm2d" num_features="256" />
+      <module name="C13"  type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="C13B" type="batchnorm2d" num_features="256" />
+      <module name="C15"  type="conv2d" in_channels="256" out_channels="256" kernel_size="1" padding="1" />
+      <module name="C15B" type="batchnorm2d" num_features="256" />
+      <!-- Block#4 -->
+      <module name="C18"  type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C18B" type="batchnorm2d" num_features="512" />
+      <module name="C20"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C20B" type="batchnorm2d" num_features="512" />
+      <module name="C22"  type="conv2d" in_channels="512" out_channels="512" kernel_size="1" padding="1" />
+      <module name="C22B" type="batchnorm2d" num_features="512" />
+      <!-- Block#5 -->
+      <module name="C25"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C25B" type="batchnorm2d" num_features="512" />
+      <module name="C27"  type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="C27B" type="batchnorm2d" num_features="512" />
+      <module name="C29"  type="conv2d" in_channels="512" out_channels="512" kernel_size="1" padding="1" />
+      <module name="C29B" type="batchnorm2d" num_features="512" />
+      <!-- FC -->
+      <module name="FC32" type="linear" in_features="25088" out_features="4096" />
+      <module name="FC35" type="linear" in_features="4096"  out_features="4096" />
+      <module name="FC38" type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="C1" />
+      <f module="C1B" />
+      <f functional="relu" inplace="true" />
+      <f module="C3" />
+      <f module="C3B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C6" />
+      <f module="C6B" />
+      <f functional="relu" inplace="true" />
+      <f module="C8" />
+      <f module="C8B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C11" />
+      <f module="C11B" />
+      <f functional="relu" inplace="true" />
+      <f module="C13" />
+      <f module="C13B" />
+      <f functional="relu" inplace="true" />
+      <f module="C15" />
+      <f module="C15B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C18" />
+      <f module="C18B" />
+      <f functional="relu" inplace="true" />
+      <f module="C20" />
+      <f module="C20B" />
+      <f functional="relu" inplace="true" />
+      <f module="C22" />
+      <f module="C22B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f module="C25" />
+      <f module="C25B" />
+      <f functional="relu" inplace="true" />
+      <f module="C27" />
+      <f module="C27B" />
+      <f functional="relu" inplace="true" />
+      <f module="C29" />
+      <f module="C29B" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="FC32" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC35" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="FC38" />
+    </forward>
+  </nn>
   <nn name="VGGD_NoBatchNorm" cat="VGG">
     <modules>
       <!-- Block#1 -->
@@ -164,15 +592,213 @@
       <f module="FC38" />
     </forward>
   </nn>
+  <nn name="VGGE_NoBatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="conv_1_1"   type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="conv_1_2"   type="conv2d" in_channels="64"  out_channels="64"  kernel_size="3" padding="1" />
+      <!-- Block#2 -->
+      <module name="conv_2_1"   type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="conv_2_2"   type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" />
+      <!-- Block#3 -->
+      <module name="conv_3_1"   type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="conv_3_2"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="conv_3_3"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="conv_3_4"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <!-- Block#4 -->
+      <module name="conv_4_1"   type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_4_2"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_4_3"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_4_4"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <!-- Block#5 -->
+      <module name="conv_5_1"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_5_2"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_5_3"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="conv_5_4"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <!-- FC -->
+      <module name="fc1"        type="linear" in_features="25088" out_features="4096" />
+      <module name="fc2"        type="linear" in_features="4096"  out_features="4096" />
+      <module name="fc3"        type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <!-- Block#1 -->
+      <f module="conv_1_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_1_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#2 -->
+      <f module="conv_2_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_2_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#3 -->
+      <f module="conv_3_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_2" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_3" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_4" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#4 -->
+      <f module="conv_4_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_2" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_3" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_4" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#5 -->
+      <f module="conv_5_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_2" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_3" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_4" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="fc1" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc2" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc3" />
+    </forward>
+  </nn>
+  <nn name="VGGE_BatchNorm" cat="VGG">
+    <modules>
+      <!-- Block#1 -->
+      <module name="conv_1_1"   type="conv2d" in_channels="3"   out_channels="64"  kernel_size="3" padding="1" />
+      <module name="btn_1_1"    type="batchnorm2d" num_features="64" />
+      <module name="conv_1_2"   type="conv2d" in_channels="64"  out_channels="64"  kernel_size="3" padding="1" />
+      <module name="btn_1_2"    type="batchnorm2d" num_features="64" />
+      <!-- Block#2 -->
+      <module name="conv_2_1"   type="conv2d" in_channels="64"  out_channels="128" kernel_size="3" padding="1" />
+      <module name="btn_2_1"    type="batchnorm2d" num_features="128" />
+      <module name="conv_2_2"   type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" />
+      <module name="btn_2_2"    type="batchnorm2d" num_features="128" />
+      <!-- Block#3 -->
+      <module name="conv_3_1"   type="conv2d" in_channels="128" out_channels="256" kernel_size="3" padding="1" />
+      <module name="btn_3_1"    type="batchnorm2d" num_features="256" />
+      <module name="conv_3_2"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="btn_3_2"    type="batchnorm2d" num_features="256" />
+      <module name="conv_3_3"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="btn_3_3"    type="batchnorm2d" num_features="256" />
+      <module name="conv_3_4"   type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" />
+      <module name="btn_3_4"    type="batchnorm2d" num_features="256" />
+      <!-- Block#4 -->
+      <module name="conv_4_1"   type="conv2d" in_channels="256" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_4_1"    type="batchnorm2d" num_features="512" />
+      <module name="conv_4_2"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_4_2"    type="batchnorm2d" num_features="512" />
+      <module name="conv_4_3"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_4_3"    type="batchnorm2d" num_features="512" />
+      <module name="conv_4_4"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_4_4"    type="batchnorm2d" num_features="512" />
+      <!-- Block#5 -->
+      <module name="conv_5_1"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_5_1"    type="batchnorm2d" num_features="512" />
+      <module name="conv_5_2"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_5_2"    type="batchnorm2d" num_features="512" />
+      <module name="conv_5_3"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_5_3"    type="batchnorm2d" num_features="512" />
+      <module name="conv_5_4"   type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" />
+      <module name="btn_5_4"    type="batchnorm2d" num_features="512" />
+      <!-- FC -->
+      <module name="fc1"        type="linear" in_features="25088" out_features="4096" />
+      <module name="fc2"        type="linear" in_features="4096"  out_features="4096" />
+      <module name="fc3"        type="linear" in_features="4096"  out_features="1000" />
+    </modules>
+    <forward>
+      <!-- Block#1 -->
+      <f module="conv_1_1" />
+      <f module="btn_1_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_1_2" />
+      <f module="btn_1_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#2 -->
+      <f module="conv_2_1" />
+      <f module="btn_2_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_2_2" />
+      <f module="btn_2_2" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#3 -->
+      <f module="conv_3_1" />
+      <f module="btn_3_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_2" />
+      <f module="btn_3_2" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_3" />
+      <f module="btn_3_3" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_3_4" />
+      <f module="btn_3_4" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#4 -->
+      <f module="conv_4_1" />
+      <f module="btn_4_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_2" />
+      <f module="btn_4_2" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_3" />
+      <f module="btn_4_3" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_4_4" />
+      <f module="btn_4_4" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <!-- Block#5 -->
+      <f module="conv_5_1" />
+      <f module="btn_5_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_2" />
+      <f module="btn_5_1" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_3" />
+      <f module="btn_5_3" />
+      <f functional="relu" inplace="true" />
+      <f module="conv_5_4" />
+      <f module="btn_5_4" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="2" />
+      <f view="flat" />
+      <f module="fc1" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc2" />
+      <f functional="relu" inplace="true" />
+      <!-- drop-out can't set 'inplace' to true, otherwise, the backward will fail. -->
+      <f functional="dropout" inplace="false" p="0.5" />
+      <f module="fc3" />
+    </forward>
+  </nn>
   <nn name="ResNet18" cat="ResNet">
     <modules>
-      <module name="conv1"      type="conv2d" in_channels="3" out_channels="64" kernel_size="3" padding="3" stride="2" bias="false" />
-      <module name="bn1"        type="batchnorm2d" num_features="64" />
+      <module name="conv1"      type="conv2d" in_channels="3" out_channels="64" kernel_size="7" padding="3" stride="2" bias="false" />
+      <module name="btn1"       type="batchnorm2d" num_features="64" />
       <!-- layer#1 -->
       <!-- block#1 -->
       <module name="conv_1_1_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0"/>
       <module name="btn_1_1_1"  type="batchnorm2d" num_features="64" />
-      <module name="conv_1_1_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" bias="0" />
+      <module name="conv_1_1_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
       <module name="btn_1_1_2"  type="batchnorm2d" num_features="64" />
       <!-- block#2-->
       <module name="conv_1_2_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
@@ -183,45 +809,43 @@
       <!-- block#1 -->
       <module name="conv_2_1_1" type="conv2d" in_channels="64" out_channels="128" kernel_size="3" stride="2" padding="1" bias="0" />
       <module name="btn_2_1_1"  type="batchnorm2d" num_features="128" />
-      <module name="conv_2_1_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" bias="0" />
+      <module name="conv_2_1_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
       <module name="btn_2_1_2"  type="batchnorm2d" num_features="128" />
       <module name="conv_2_1_3" type="conv2d" in_channels="64" out_channels="128" kernel_size="1" stride="2" bias="0" />
       <module name="btn_2_1_3"  type="batchnorm2d" num_features="128" />
       <!-- block#2 -->
-      <module name="conv_2_2_1" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" bias="0" />
+      <module name="conv_2_2_1" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
       <module name="btn_2_2_1"  type="batchnorm2d" num_features="128" />
-      <module name="conv_2_2_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" bias="0" />
+      <module name="conv_2_2_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
       <module name="btn_2_2_2"  type="batchnorm2d" num_features="128" />
       <!-- layer#3 -->
       <!-- block#1 -->
       <module name="conv_3_1_1" type="conv2d" in_channels="128" out_channels="256" kernel_size="3" stride="2" padding="1" bias="0" />
       <module name="btn_3_1_1"  type="batchnorm2d" num_features="256" />
-      <module name="conv_3_1_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" bias="0" />
+      <module name="conv_3_1_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
       <module name="btn_3_1_2"  type="batchnorm2d" num_features="256" />
       <module name="conv_3_1_3" type="conv2d" in_channels="128" out_channels="256" kernel_size="1" stride="2" bias="0" />
       <module name="btn_3_1_3"  type="batchnorm2d" num_features="256" />
       <!-- block#2 -->
-      <module name="conv_3_2_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" bias="0" />
+      <module name="conv_3_2_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
       <module name="btn_3_2_1"  type="batchnorm2d" num_features="256" />
-      <module name="conv_3_2_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" bias="0" />
+      <module name="conv_3_2_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
       <module name="btn_3_2_2"  type="batchnorm2d" num_features="256" />
       <!-- layer#4 -->
       <!-- block#1 -->
       <module name="conv_4_1_1" type="conv2d" in_channels="256" out_channels="512" kernel_size="3" stride="2" padding="1" bias="0" />
       <module name="btn_4_1_1"  type="batchnorm2d" num_features="512" />
-      <module name="conv_4_1_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" bias="0" />
+      <module name="conv_4_1_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
       <module name="btn_4_1_2"  type="batchnorm2d" num_features="512" />
       <module name="conv_4_1_3" type="conv2d" in_channels="256" out_channels="512" kernel_size="1" stride="2" bias="0" />
       <module name="btn_4_1_3"  type="batchnorm2d" num_features="512" />
       <!-- block#2 -->
-      <module name="conv_4_2_1" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" bias="0" />
+      <module name="conv_4_2_1" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
       <module name="btn_4_2_1"  type="batchnorm2d" num_features="512" />
-      <module name="conv_4_2_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" bias="0" />
+      <module name="conv_4_2_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
       <module name="btn_4_2_2"  type="batchnorm2d" num_features="512" />
-      <!-- avgpool -->
-      <module name="avgpool" type="adaptiveavgpool2d" outputsize="1" />
       <!-- full connection -->
-      <module name="fc" type="linear" in_features="4096"  out_features="1000" />
+      <module name="fc" type="linear" in_features="512"  out_features="1000" />
     </modules>
     <forward>
       <f module="conv1" />
@@ -230,24 +854,40 @@
       <f functional="max_pool2d" kernel_size="3" stride="2" padding="1" />
       <!-- layer#1 -->
       <!-- block#1 -->
-      <f module="conv_1_1_1" />
-      <f module="btn_1_1_1" />
-      <f functional="relu" />
-      <f module="conv_1_1_2" />
-      <f module="btn_1_1_2" />
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_1_1" />
+          <f module="btn_1_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_1_2" />
+          <f module="btn_1_1_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
       <!-- block#2 -->
-      <f module="conv_1_2_1" />
-      <f module="btn_1_2_1" />
-      <f functional="relu" />
-      <f module="conv_1_2_2" />
-      <f module="btn_1_2_2" />
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_2_1" />
+          <f module="btn_1_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_2_2" />
+          <f module="btn_1_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
       <!-- layer#2 -->
       <!-- block#1 -->
       <parallel mergeop="plus">
         <branch>
           <f module="conv_2_1_1" />
           <f module="btn_2_1_1" />
-          <f functional="relu" />
+          <f functional="relu" inplace="true" />
           <f module="conv_2_1_2" />
           <f module="btn_2_1_2" />
         </branch>
@@ -256,19 +896,28 @@
           <f module="btn_2_1_3" />
         </branch>
       </parallel>
+      <f functional="relu" inplace="true" />
       <!-- block#2 -->
-      <f module="conv_2_2_1" />
-      <f module="btn_2_2_1" />
-      <f functional="relu" />
-      <f module="conv_2_2_2" />
-      <f module="btn_2_2_2" />
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_2_1" />
+          <f module="btn_2_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_2_2" />
+          <f module="btn_2_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
       <!-- layer#3 -->
       <!-- block#1 -->
       <parallel mergeop="plus">
         <branch>
           <f module="conv_3_1_1" />
           <f module="btn_3_1_1" />
-          <f functional="relu" />
+          <f functional="relu" inplace="true" />
           <f module="conv_3_1_2" />
           <f module="btn_3_1_2" />
         </branch>
@@ -277,19 +926,28 @@
           <f module="btn_3_1_3" />
         </branch>
       </parallel>
+      <f functional="relu" inplace="true" />
       <!-- block#2 -->
-      <f module="conv_3_2_1" />
-      <f module="btn_3_2_1" />
-      <f functional="relu" />
-      <f module="conv_3_2_2" />
-      <f module="btn_3_2_2" />
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_2_1" />
+          <f module="btn_3_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_2_2" />
+          <f module="btn_3_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
       <!-- layer#4 -->
       <!-- block#1 -->
       <parallel mergeop="plus">
         <branch>
           <f module="conv_4_1_1" />
           <f module="btn_4_1_1" />
-          <f functional="relu" />
+          <f functional="relu" inplace="true" />
           <f module="conv_4_1_2" />
           <f module="btn_4_1_2" />
         </branch>
@@ -298,14 +956,785 @@
           <f module="btn_4_1_3" />
         </branch>
       </parallel>
+      <f functional="relu" inplace="true" />
       <!-- block#2 -->
-      <f module="conv_4_2_1" />
-      <f module="btn_4_2_1" />
-      <f functional="relu" />
-      <f module="conv_4_2_2" />
-      <f module="btn_4_2_2" />
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_2_1" />
+          <f module="btn_4_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_2_2" />
+          <f module="btn_4_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
       <!-- avgpool -->
-      <f module="avgpool" />
+      <f functional="adaptive_avg_pool2d" outputsize="1" />
+      <f view="flat" />
+      <f module="fc" />
+    </forward>
+  </nn>
+  <nn name="ResNet34" cat="ResNet">
+    <!-- 3, 4, 6, 3-->
+    <modules>
+      <module name="conv1"      type="conv2d" in_channels="3" out_channels="64" kernel_size="7" padding="3" stride="2" bias="false" />
+      <module name="btn1"       type="batchnorm2d" num_features="64" />
+      <!-- layer#1 -->
+      <!-- block#1 -->
+      <module name="conv_1_1_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0"/>
+      <module name="btn_1_1_1"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_1_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_1_2"  type="batchnorm2d" num_features="64" />
+      <!-- block#2-->
+      <module name="conv_1_2_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_2_1"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_2_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_2_2"  type="batchnorm2d" num_features="64" />
+      <!-- block#3-->
+      <module name="conv_1_3_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_3_1"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_3_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_3_2"  type="batchnorm2d" num_features="64" />      
+      <!-- layer#2 -->
+      <!-- block#1 -->
+      <module name="conv_2_1_1" type="conv2d" in_channels="64" out_channels="128" kernel_size="3" stride="2" padding="1" bias="0" />
+      <module name="btn_2_1_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_1_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_1_2"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_1_3" type="conv2d" in_channels="64" out_channels="128" kernel_size="1" stride="2" bias="0" />
+      <module name="btn_2_1_3"  type="batchnorm2d" num_features="128" />
+      <!-- block#2 -->
+      <module name="conv_2_2_1" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_2_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_2_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_2_2"  type="batchnorm2d" num_features="128" />
+      <!-- block#3 -->
+      <module name="conv_2_3_1" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_3_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_3_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_3_2"  type="batchnorm2d" num_features="128" />
+      <!-- block#4 -->
+      <module name="conv_2_4_1" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_4_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_4_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_4_2"  type="batchnorm2d" num_features="128" />
+      <!-- layer#3 -->
+      <!-- block#1 -->
+      <module name="conv_3_1_1" type="conv2d" in_channels="128" out_channels="256" kernel_size="3" stride="2" padding="1" bias="0" />
+      <module name="btn_3_1_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_1_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_1_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_1_3" type="conv2d" in_channels="128" out_channels="256" kernel_size="1" stride="2" bias="0" />
+      <module name="btn_3_1_3"  type="batchnorm2d" num_features="256" />
+      <!-- block#2 -->
+      <module name="conv_3_2_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_2_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_2_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_2_2"  type="batchnorm2d" num_features="256" />
+      <!-- block#3 -->
+      <module name="conv_3_3_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_3_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_3_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_3_2"  type="batchnorm2d" num_features="256" />
+      <!-- block#4 -->
+      <module name="conv_3_4_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_4_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_4_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_4_2"  type="batchnorm2d" num_features="256" />
+      <!-- block#5 -->
+      <module name="conv_3_5_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_5_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_5_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_5_2"  type="batchnorm2d" num_features="256" />
+      <!-- block#6 -->
+      <module name="conv_3_6_1" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_6_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_6_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_6_2"  type="batchnorm2d" num_features="256" />
+      <!-- layer#4 -->
+      <!-- block#1 -->
+      <module name="conv_4_1_1" type="conv2d" in_channels="256" out_channels="512" kernel_size="3" stride="2" padding="1" bias="0" />
+      <module name="btn_4_1_1"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_1_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_1_2"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_1_3" type="conv2d" in_channels="256" out_channels="512" kernel_size="1" stride="2" bias="0" />
+      <module name="btn_4_1_3"  type="batchnorm2d" num_features="512" />
+      <!-- block#2 -->
+      <module name="conv_4_2_1" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_2_1"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_2_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_2_2"  type="batchnorm2d" num_features="512" />
+      <!-- block#3 -->
+      <module name="conv_4_3_1" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_3_1"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_3_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_3_2"  type="batchnorm2d" num_features="512" />      
+      <!-- full connection -->
+      <module name="fc" type="linear" in_features="512"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="conv1" />
+      <f module="btn1" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="3" stride="2" padding="1" />
+      <!-- layer#1 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_1_1" />
+          <f module="btn_1_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_1_2" />
+          <f module="btn_1_1_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_2_1" />
+          <f module="btn_1_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_2_2" />
+          <f module="btn_1_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_3_1" />
+          <f module="btn_1_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_3_2" />
+          <f module="btn_1_3_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />      
+      <!-- layer#2 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_1_1" />
+          <f module="btn_2_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_1_2" />
+          <f module="btn_2_1_2" />
+        </branch>
+        <branch>
+          <f module="conv_2_1_3" />
+          <f module="btn_2_1_3" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_2_1" />
+          <f module="btn_2_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_2_2" />
+          <f module="btn_2_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_3_1" />
+          <f module="btn_2_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_3_2" />
+          <f module="btn_2_3_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#4 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_4_1" />
+          <f module="btn_2_4_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_4_2" />
+          <f module="btn_2_4_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- layer#3 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_1_1" />
+          <f module="btn_3_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_1_2" />
+          <f module="btn_3_1_2" />
+        </branch>
+        <branch>
+          <f module="conv_3_1_3" />
+          <f module="btn_3_1_3" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_2_1" />
+          <f module="btn_3_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_2_2" />
+          <f module="btn_3_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_3_1" />
+          <f module="btn_3_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_3_2" />
+          <f module="btn_3_3_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#4 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_4_1" />
+          <f module="btn_3_4_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_4_2" />
+          <f module="btn_3_4_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#5 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_5_1" />
+          <f module="btn_3_5_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_5_2" />
+          <f module="btn_3_5_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#6 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_6_1" />
+          <f module="btn_3_6_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_6_2" />
+          <f module="btn_3_6_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- layer#4 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_1_1" />
+          <f module="btn_4_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_1_2" />
+          <f module="btn_4_1_2" />
+        </branch>
+        <branch>
+          <f module="conv_4_1_3" />
+          <f module="btn_4_1_3" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_2_1" />
+          <f module="btn_4_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_2_2" />
+          <f module="btn_4_2_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_3_1" />
+          <f module="btn_4_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_3_2" />
+          <f module="btn_4_3_2" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- avgpool -->
+      <f functional="adaptive_avg_pool2d" outputsize="1" />
+      <f view="flat" />
+      <f module="fc" />
+    </forward>
+  </nn>
+  <nn name="ResNet50" cat="ResNet">
+    <!-- 3, 4, 6, 3-->
+    <modules>
+      <module name="conv1"      type="conv2d" in_channels="3" out_channels="64" kernel_size="7" padding="3" stride="2" bias="false" />
+      <module name="btn1"       type="batchnorm2d" num_features="64" />
+      <!-- layer#1 -->
+      <!-- block#1 -->
+      <module name="conv_1_1_1" type="conv2d" in_channels="64" out_channels="64" kernel_size="1" bias="0"/>
+      <module name="btn_1_1_1"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_1_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_1_2"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_1_3" type="conv2d" in_channels="64" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_1_1_3"  type="batchnorm2d" num_features="256" />
+      <module name="conv_1_1_4" type="conv2d" in_channels="64" out_channels="256" kernel_size="1" stride="1" bias="0" />
+      <module name="btn_1_1_4"  type="batchnorm2d" num_features="256" />
+      <!-- block#2-->
+      <module name="conv_1_2_1" type="conv2d" in_channels="256" out_channels="64" kernel_size="1" bias="0" />
+      <module name="btn_1_2_1"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_2_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_2_2"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_2_3" type="conv2d" in_channels="64" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_1_2_3"  type="batchnorm2d" num_features="256" />
+      <!-- block#3-->
+      <module name="conv_1_3_1" type="conv2d" in_channels="256" out_channels="64" kernel_size="1" bias="0" />
+      <module name="btn_1_3_1"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_3_2" type="conv2d" in_channels="64" out_channels="64" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_1_3_2"  type="batchnorm2d" num_features="64" />
+      <module name="conv_1_3_3" type="conv2d" in_channels="64" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_1_3_3"  type="batchnorm2d" num_features="256" />
+      <!-- layer#2 -->
+      <!-- block#1 -->
+      <module name="conv_2_1_1" type="conv2d" in_channels="256" out_channels="128" kernel_size="1" bias="0" />
+      <module name="btn_2_1_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_1_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" stride="2" padding="1" bias="0" />
+      <module name="btn_2_1_2"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_1_3" type="conv2d" in_channels="128" out_channels="512" kernel_size="1" bias="0" />
+      <module name="btn_2_1_3"  type="batchnorm2d" num_features="512" />
+      <module name="conv_2_1_4" type="conv2d" in_channels="256" out_channels="512" kernel_size="1" stride="2" bias="0" />
+      <module name="btn_2_1_4"  type="batchnorm2d" num_features="512" />
+      <!-- block#2 -->
+      <module name="conv_2_2_1" type="conv2d" in_channels="512" out_channels="128" kernel_size="1" bias="0" />
+      <module name="btn_2_2_1"  type="batchnorm2d" num_features="128" />      
+      <module name="conv_2_2_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_2_2"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_2_3" type="conv2d" in_channels="128" out_channels="512" kernel_size="1" bias="0" />
+      <module name="btn_2_2_3"  type="batchnorm2d" num_features="512" />
+      <!-- block#3 -->
+      <module name="conv_2_3_1" type="conv2d" in_channels="512" out_channels="128" kernel_size="1" bias="0" />
+      <module name="btn_2_3_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_3_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_3_2"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_3_3" type="conv2d" in_channels="128" out_channels="512" kernel_size="1" bias="0" />
+      <module name="btn_2_3_3"  type="batchnorm2d" num_features="512" />
+      <!-- block#4 -->
+      <module name="conv_2_4_1" type="conv2d" in_channels="512" out_channels="128" kernel_size="1" bias="0" />
+      <module name="btn_2_4_1"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_4_2" type="conv2d" in_channels="128" out_channels="128" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_2_4_2"  type="batchnorm2d" num_features="128" />
+      <module name="conv_2_4_3" type="conv2d" in_channels="128" out_channels="512" kernel_size="1" bias="0" />
+      <module name="btn_2_4_3"  type="batchnorm2d" num_features="512" />
+      <!-- layer#3 -->
+      <!-- block#1 -->
+      <module name="conv_3_1_1" type="conv2d" in_channels="512" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_3_1_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_1_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" stride="2" padding="1" bias="0" />
+      <module name="btn_3_1_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_1_3" type="conv2d" in_channels="256" out_channels="1024" kernel_size="1" bias="0" />
+      <module name="btn_3_1_3"  type="batchnorm2d" num_features="1024" />
+      <module name="conv_3_1_4" type="conv2d" in_channels="512" out_channels="1024" kernel_size="1" stride="2" bias="0" />
+      <module name="btn_3_1_4"  type="batchnorm2d" num_features="1024" />
+      <!-- block#2 -->
+      <module name="conv_3_2_1" type="conv2d" in_channels="1024" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_3_2_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_2_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_2_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_2_3" type="conv2d" in_channels="256" out_channels="1024" kernel_size="1" bias="0" />
+      <module name="btn_3_2_3"  type="batchnorm2d" num_features="1024" />
+      <!-- block#3 -->
+      <module name="conv_3_3_1" type="conv2d" in_channels="1024" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_3_3_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_3_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_3_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_3_3" type="conv2d" in_channels="256" out_channels="1024" kernel_size="1" bias="0" />
+      <module name="btn_3_3_3"  type="batchnorm2d" num_features="1024" />
+      <!-- block#4 -->
+      <module name="conv_3_4_1" type="conv2d" in_channels="1024" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_3_4_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_4_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_4_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_4_3" type="conv2d" in_channels="256" out_channels="1024" kernel_size="1" bias="0" />
+      <module name="btn_3_4_3"  type="batchnorm2d" num_features="1024" />
+      <!-- block#5 -->
+      <module name="conv_3_5_1" type="conv2d" in_channels="1024" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_3_5_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_5_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_5_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_5_3" type="conv2d" in_channels="256" out_channels="1024" kernel_size="1" bias="0" />
+      <module name="btn_3_5_3"  type="batchnorm2d" num_features="1024" />
+      <!-- block#6 -->
+      <module name="conv_3_6_1" type="conv2d" in_channels="1024" out_channels="256" kernel_size="1" bias="0" />
+      <module name="btn_3_6_1"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_6_2" type="conv2d" in_channels="256" out_channels="256" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_3_6_2"  type="batchnorm2d" num_features="256" />
+      <module name="conv_3_6_3" type="conv2d" in_channels="256" out_channels="1024" kernel_size="1" bias="0" />
+      <module name="btn_3_6_3"  type="batchnorm2d" num_features="1024" />
+      <!-- layer#4 -->
+      <!-- block#1 -->
+      <module name="conv_4_1_1" type="conv2d" in_channels="1024" out_channels="512" kernel_size="1" stride="1" bias="0" />
+      <module name="btn_4_1_1"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_1_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" stride="2" padding="1" bias="0" />
+      <module name="btn_4_1_2"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_1_3" type="conv2d" in_channels="512" out_channels="2048" kernel_size="1" stride="1" bias="0" />
+      <module name="btn_4_1_3"  type="batchnorm2d" num_features="2048" />
+      <module name="conv_4_1_4" type="conv2d" in_channels="1024" out_channels="2048" kernel_size="1" stride="2" bias="0" />
+      <module name="btn_4_1_4"  type="batchnorm2d" num_features="2048" />      
+      <!-- block#2 -->
+      <module name="conv_4_2_1" type="conv2d" in_channels="2048" out_channels="512" kernel_size="1" bias="0" />
+      <module name="btn_4_2_1"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_2_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_2_2"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_2_3" type="conv2d" in_channels="512" out_channels="2048" kernel_size="1" stride="1" bias="0" />
+      <module name="btn_4_2_3"  type="batchnorm2d" num_features="2048" />      
+      <!-- block#3 -->
+      <module name="conv_4_3_1" type="conv2d" in_channels="2048" out_channels="512" kernel_size="1" bias="0" />
+      <module name="btn_4_3_1"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_3_2" type="conv2d" in_channels="512" out_channels="512" kernel_size="3" padding="1" bias="0" />
+      <module name="btn_4_3_2"  type="batchnorm2d" num_features="512" />
+      <module name="conv_4_3_3" type="conv2d" in_channels="512" out_channels="2048" kernel_size="1" stride="1" bias="0" />
+      <module name="btn_4_3_3"  type="batchnorm2d" num_features="2048" />
+
+      <!-- full connection -->
+      <module name="fc" type="linear" in_features="2048"  out_features="1000" />
+    </modules>
+    <forward>
+      <f module="conv1" />
+      <f module="btn1" />
+      <f functional="relu" inplace="true" />
+      <f functional="max_pool2d" kernel_size="3" stride="2" padding="1" />
+      <!-- layer#1 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_1_1" />
+          <f module="btn_1_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_1_2" />
+          <f module="btn_1_1_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_1_3" />
+          <f module="btn_1_1_3" />
+        </branch>
+        <branch>
+          <f module="conv_1_1_4" />
+          <f module="btn_1_1_4" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_2_1" />
+          <f module="btn_1_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_2_2" />
+          <f module="btn_1_2_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_2_3" />
+          <f module="btn_1_2_3" />          
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_1_3_1" />
+          <f module="btn_1_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_3_2" />
+          <f module="btn_1_3_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_1_3_3" />
+          <f module="btn_1_3_3" />          
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- layer#2 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_1_1" />
+          <f module="btn_2_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_1_2" />
+          <f module="btn_2_1_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_1_3" />
+          <f module="btn_2_1_3" />
+        </branch>
+        <branch>
+          <f module="conv_2_1_4" />
+          <f module="btn_2_1_4" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_2_1" />
+          <f module="btn_2_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_2_2" />
+          <f module="btn_2_2_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_2_3" />
+          <f module="btn_2_2_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_3_1" />
+          <f module="btn_2_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_3_2" />
+          <f module="btn_2_3_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_3_3" />
+          <f module="btn_2_3_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#4 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_2_4_1" />
+          <f module="btn_2_4_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_4_2" />
+          <f module="btn_2_4_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_2_4_3" />
+          <f module="btn_2_4_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- layer#3 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_1_1" />
+          <f module="btn_3_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_1_2" />
+          <f module="btn_3_1_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_1_3" />
+          <f module="btn_3_1_3" />
+        </branch>
+        <branch>
+          <f module="conv_3_1_4" />
+          <f module="btn_3_1_4" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_2_1" />
+          <f module="btn_3_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_2_2" />
+          <f module="btn_3_2_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_2_3" />
+          <f module="btn_3_2_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_3_1" />
+          <f module="btn_3_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_3_2" />
+          <f module="btn_3_3_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_3_3" />
+          <f module="btn_3_3_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <!-- block#4 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_4_1" />
+          <f module="btn_3_4_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_4_2" />
+          <f module="btn_3_4_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_4_3" />
+          <f module="btn_3_4_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <!-- block#5 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_5_1" />
+          <f module="btn_3_5_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_5_2" />
+          <f module="btn_3_5_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_5_3" />
+          <f module="btn_3_5_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <!-- block#6 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_3_6_1" />
+          <f module="btn_3_6_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_6_2" />
+          <f module="btn_3_6_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_3_6_3" />
+          <f module="btn_3_6_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- layer#4 -->
+      <!-- block#1 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_1_1" />
+          <f module="btn_4_1_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_1_2" />
+          <f module="btn_4_1_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_1_3" />
+          <f module="btn_4_1_3" />
+        </branch>
+        <branch>
+          <f module="conv_4_1_4" />
+          <f module="btn_4_1_4" />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#2 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_2_1" />
+          <f module="btn_4_2_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_2_2" />
+          <f module="btn_4_2_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_2_3" />
+          <f module="btn_4_2_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- block#3 -->
+      <parallel mergeop="plus">
+        <branch>
+          <f module="conv_4_3_1" />
+          <f module="btn_4_3_1" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_3_2" />
+          <f module="btn_4_3_2" />
+          <f functional="relu" inplace="true" />
+          <f module="conv_4_3_3" />
+          <f module="btn_4_3_3" />
+        </branch>
+        <branch>
+          <identity />
+        </branch>
+      </parallel>
+      <f functional="relu" inplace="true" />
+      <!-- avgpool -->
+      <f functional="adaptive_avg_pool2d" outputsize="1" />
+      <f view="flat" />
       <f module="fc" />
     </forward>
   </nn>

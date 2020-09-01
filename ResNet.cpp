@@ -16,6 +16,9 @@ extern void FreeBlob(void* p);
 #define RESNET_INPUT_IMG_HEIGHT					224
 #define RESNET_TRAIN_BATCH_SIZE					64
 
+#define RESNET_DEFAULT_WEIGHT_DECAY				0.0001
+#define RESNET_DEFAULT_MOMENTUM					0.9
+
 std::map<RESNET_CONFIG, std::string> _RESNET_CONFIG_NAMES =
 {
 	{RESNET_18,				"RESNET18"},
@@ -35,17 +38,6 @@ ResNet::~ResNet()
 {
 	m_imageprocessor.Uninit();
 	Uninit();
-}
-
-int ResNet::loadnet(RESNET_CONFIG config, int num_classes, bool use_32x32_input)
-{
-	m_RESNET_config = config;
-	m_num_classes = num_classes;
-	m_use_32x32_input = use_32x32_input;
-
-	m_imageprocessor.Init(m_use_32x32_input ? 32 : RESNET_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : RESNET_INPUT_IMG_HEIGHT);
-
-	return _Init();
 }
 
 int ResNet::_Init()
@@ -92,11 +84,15 @@ int ResNet::unloadnet()
 }
 
 int ResNet::train(const char* szImageSetRootPath,
+	IMGSET_TYPE img_type,
 	const char* szTrainSetStateFilePath,
+	LearningRateMgr* pLRMgr,
 	int batch_size,
 	int num_epoch,
-	float learning_rate,
-	unsigned int showloss_per_num_of_batches)
+	unsigned int showloss_per_num_of_batches,
+	double weight_decay,
+	double momentum,
+	OPTIM_TYPE optim_type)
 {
 	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name classname/picture_file_name
@@ -107,9 +103,6 @@ int ResNet::train(const char* szImageSetRootPath,
 	auto tm_end = tm_start;
 	TCHAR szDirPath[MAX_PATH] = { 0 };
 	TCHAR* tszImageSetRootPath = NULL;
-
-	if (_Init() != 0)
-		return -1;
 
 	// Convert UTF-8 to Unicode
 #ifdef _UNICODE
@@ -132,12 +125,35 @@ int ResNet::train(const char* szImageSetRootPath,
 		return -1;
 	}
 
+	m_imageprocessor.SetImageTransformMode((ImageTransformMode)(/*IMG_TM_PADDING_RESIZE | */IMG_TM_RANDOM_CROP | IMG_TM_CENTER_CROP | IMG_TM_RANDOM_HORIZONTAL_FLIPPING));
+
 	batch_size = batch_size < 0 ? 1 : batch_size;
 
-	double lr = learning_rate > 0.f ? (double)learning_rate : 0.01;
+	double lr = pLRMgr->GetLearningRate();
+	double wd = isnan(weight_decay) ? RESNET_DEFAULT_WEIGHT_DECAY : (double)weight_decay;
+	double m = isnan(momentum) ? RESNET_DEFAULT_MOMENTUM : momentum;
+	ImageTransformMode image_tm = m_imageprocessor.GetImageTransformMode();
+
+	printf("=======================================================================\n");
+	printf("Image train-set enhancement:\n");
+	printf("\trandom padding_resize: %s\n", (image_tm&IMG_TM_PADDING_RESIZE) ? "enable" : "disable");
+	printf("\trandom throughout resize: %s\n", (image_tm&IMG_TM_RESIZE) ? "enable" : "disable");
+	printf("\trandom crop: %s\n", (image_tm&IMG_TM_RANDOM_CROP) ? "enable" : "disable");
+	printf("\trandom center crop: %s\n", (image_tm&IMG_TM_CENTER_CROP) ? "enable" : "disable");
+	printf("\trandom horizontal flipping: %s\n", (image_tm&IMG_TM_RANDOM_HORIZONTAL_FLIPPING) ? "enable" : "disable");
+	printf("optimizer: %s\n", OPTIM_NAME(optim_type));
+	printf("weight decay: %s\n", doublecompactstring(wd).c_str());
+	printf("momentum: %s\n", doublecompactstring(m).c_str());
+	printf("learning rate: %s\n", doublecompactstring(pLRMgr->GetLearningRate()).c_str());
+	printf("batch size: %d\n", batch_size);
+	printf("=======================================================================\n");
+
 	auto criterion = torch::nn::CrossEntropyLoss();
-	//auto optimizer = torch::optim::SGD(parameters(), torch::optim::SGDOptions(0.001).momentum(0.9));
-	auto optimizer = torch::optim::SGD(parameters(), torch::optim::SGDOptions(lr).momentum(0.9));
+	torch::optim::Optimizer* optimizer = NULL;
+	if (optim_type == OPTIM_Adam)
+		optimizer = new torch::optim::Adam(parameters(), torch::optim::AdamOptions(lr).weight_decay(wd));
+	else
+		optimizer = new torch::optim::SGD(parameters(), torch::optim::SGDOptions(lr).momentum(m).weight_decay(wd));
 	tm_end = std::chrono::system_clock::now();
 	printf("It takes %lld msec to prepare training classifying cats and dogs.\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
@@ -148,6 +164,7 @@ int ResNet::train(const char* szImageSetRootPath,
 	for (int64_t epoch = 1; epoch <= (int64_t)num_epoch; ++epoch)
 	{
 		auto running_loss = 0.;
+		auto epoch_loss = 0.;
 		size_t totals = 0;
 
 		// Shuffle the list
@@ -162,24 +179,50 @@ int ResNet::train(const char* szImageSetRootPath,
 			std::shuffle(train_image_shuffle_set.begin(), train_image_shuffle_set.end(), g);
 		}
 
-		// dynamic learning rate if no learning rate is specified
-		if (learning_rate <= 0.f)
-		{
-			for (auto& pg : optimizer.param_groups())
-			{
-				if (pg.has_options())
-				{
-					auto& options = static_cast<torch::optim::SGDOptions&>(pg.options());
-					options.lr() = lr;
-				}
-			}
-		}
-
 		// Take the image shuffle
 		for (size_t i = 0; i < (train_image_shuffle_set.size() + batch_size - 1) / batch_size; i++)
 		{
 			std::vector<ResNet::tstring> image_batches;
 			std::vector<long long> label_batches;
+
+			// dynamic learning rate if no learning rate is specified
+			if (lr != pLRMgr->GetLearningRate())
+			{
+				printf("Change the learning rate from %s to %s\n", 
+					doublecompactstring(lr).c_str(),
+					doublecompactstring(pLRMgr->GetLearningRate()).c_str());
+				lr = pLRMgr->GetLearningRate();
+				for (auto& pg : optimizer->param_groups())
+				{
+					if (pg.has_options())
+					{
+						auto& options = pg.options();
+						switch (optim_type)
+						{
+						case OPTIM_SGD:
+							static_cast<torch::optim::SGDOptions&>(pg.options()).lr() = lr;
+							break;
+						case OPTIM_Adam:
+							static_cast<torch::optim::AdamOptions&>(pg.options()).lr() = lr;
+							break;
+						case OPTIM_AdamW:
+							static_cast<torch::optim::AdamWOptions&>(pg.options()).lr() = lr;
+							break;
+						case OPTIM_LBFGS:
+							static_cast<torch::optim::LBFGSOptions&>(pg.options()).lr() = lr;
+							break;
+						case OPTIM_RMSprop:
+							static_cast<torch::optim::RMSpropOptions&>(pg.options()).lr() = lr;
+							break;
+						case OPTIM_Adagrad:
+							static_cast<torch::optim::AdagradOptions&>(pg.options()).lr() = lr;
+							break;
+						default:
+							break;
+						}
+					}
+				}
+			}
 
 			for (int b = 0; b < batch_size; b++)
 			{
@@ -207,6 +250,9 @@ int ResNet::train(const char* szImageSetRootPath,
 
 				image_batches.push_back(szImageFile);
 				label_batches.push_back((long long)label);
+
+				//_tprintf(_T("now training %s for the file: %s.\n"), 
+				//	train_image_labels[label].c_str(), szImageFile);
 			}
 
 			if (image_batches.size() == 0)
@@ -215,15 +261,13 @@ int ResNet::train(const char* szImageSetRootPath,
 			if (m_imageprocessor.ToTensor(image_batches, tensor_input) != 0)
 				continue;
 
-			//_tprintf(_T("now training %s for the file: %s.\n"), 
-			//	train_image_labels[label].c_str(), cszImgFilePath);
 			// Label在这里必须是一阶向量，里面元素必须是整数类型
 			torch::Tensor tensor_label = torch::tensor(label_batches);
 			//tensor_label = tensor_label.view({ 1, -1 });
 
 			totals += label_batches.size();
 
-			optimizer.zero_grad();
+			optimizer->zero_grad();
 			// 喂数据给网络
 			auto outputs = forward(tensor_input);
 
@@ -236,45 +280,53 @@ int ResNet::train(const char* szImageSetRootPath,
 			auto loss = criterion(outputs, tensor_label);
 			// 反馈给网络，调整权重参数进一步优化
 			loss.backward();
-			optimizer.step();
+			optimizer->step();
 
 			running_loss += loss.item().toFloat();
-			if (showloss_per_num_of_batches > 0 && ((i + 1) % showloss_per_num_of_batches == 0))
+			epoch_loss += loss.item().toFloat();
+
+			pLRMgr->OnTrainStepFinish(loss.item().toFloat());
+
+			if (showloss_per_num_of_batches > 0)
 			{
-				printf("[%lld, %5zu] loss: %.3f\n", epoch, i + 1, running_loss / showloss_per_num_of_batches);
-				running_loss = 0.;
+				if (((i + 1) % showloss_per_num_of_batches == 0))
+				{
+					printf("[%lld, %5zu] loss: %.3f epoch loss: %.3f\n", epoch, i + 1,
+						running_loss / showloss_per_num_of_batches, epoch_loss / (i + 1));
+					running_loss = 0.;
+				}
+				else if (i + 1 == (train_image_shuffle_set.size() + batch_size - 1) / batch_size)
+				{
+					printf("[%lld, %5zu] loss: %.3f epoch loss: %.3f\n", epoch, i + 1,
+						running_loss / ((i + 1) % showloss_per_num_of_batches), epoch_loss / (i + 1));
+					running_loss = 0.;
+				}
 			}
 		}
 
-		// Adjust the learning rate dynamically
-		if (learning_rate <= 0.f)
-		{
-			if (epoch % 2 == 0)
-			{
-				lr = lr * 0.1;
-				if (lr < 0.00001)
-					lr = 0.00001;
-			}
-		}
+		pLRMgr->OnTrainEpochFinish();
 	}
+
+	m_imageprocessor.SetImageTransformMode(IMG_TM_PADDING_RESIZE);
 
 	printf("Finish training!\n");
 
 	tm_end = std::chrono::system_clock::now();
 	long long train_duration = std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count();
 	printf("It took %lldh:%02dm:%02d.%03ds to finish training RESNET network!\n",
-		train_duration / 1000 / 3600,
-		(int)(train_duration / 1000 / 60 % 60),
-		(int)(train_duration / 1000 % 60),
-		(int)(train_duration % 1000));
+		train_duration / 1000 / 3600, (int)(train_duration / 1000 / 60 % 60), 
+		(int)(train_duration / 1000 % 60), (int)(train_duration % 1000));
 
 	m_image_labels = train_image_labels;
+
 	savenet(szTrainSetStateFilePath);
+
+	delete optimizer;
 
 	return 0;
 }
 
-void ResNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetStateFilePath)
+void ResNet::verify(const char* szImageSetRootPath)
 {
 	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name with the format 'classname/picture_file_name'
@@ -319,16 +371,13 @@ void ResNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetSta
 		std::shuffle(test_image_shuffle_set.begin(), test_image_shuffle_set.end(), g);
 	}
 
+	if (m_image_labels.size() == 0)
+		m_image_labels = test_image_labels;
+
 	tm_end = std::chrono::system_clock::now();
 	printf("It took %lld msec to load the test images/labels set.\n",
 		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 	tm_start = std::chrono::system_clock::now();
-
-	if (loadnet(szPreTrainSetStateFilePath) != 0)
-	{
-		printf("Failed to load the pre-trained %s network from %s.\n", szPreTrainSetStateFilePath, nnname().c_str());
-		return;
-	}
 
 	tm_end = std::chrono::system_clock::now();
 	printf("It took %lld msec to load the pre-trained network state.\n",
@@ -372,16 +421,17 @@ void ResNet::verify(const char* szImageSetRootPath, const char* szPreTrainSetSta
 		auto outputs = forward(tensor_input);
 		auto predicted = torch::max(outputs, 1);
 
-		//_tprintf(_T("predicted: %s, fact: %s --> file: %s.\n"), 
-		//	m_image_labels[std::get<1>(predicted).item<int>()].c_str(), 
-		//	m_image_labels[tensor_label[0].item<int>()].c_str(), szImageFile);
+		auto predicted_label = std::get<1>(predicted).item<int>();
+		_tprintf(_T("predicted: %s, fact: %s --> file: %s.\n"),
+			predicted_label >= 0 && predicted_label < m_image_labels.size() ? m_image_labels[predicted_label].c_str() : _T("Unknown"),
+			m_image_labels[tensor_label[0].item<int>()].c_str(), szImageFile);
 
 		if (tensor_label[0].item<int>() == std::get<1>(predicted).item<int>())
 			passed_test_items++;
 
 		total_test_items++;
 
-		//printf("label: %d.\n", labels[0].item<int>());
+		//printf("label: %d.\n", tensor_label[0].item<int>());
 		//printf("predicted label: %d.\n", std::get<1>(predicted).item<int>());
 		//std::cout << std::get<1>(predicted) << '\n';
 
@@ -419,11 +469,14 @@ void ResNet::classify(const char* cszImageFile)
 		return;
 	}
 
+	//std::cout << tensor_input << '\n';
+
 	auto outputs = forward(tensor_input);
 	auto predicted = torch::max(outputs, 1);
 
-	//std::cout << std::get<0>(predicted) << '\n';
-	//std::cout << std::get<1>(predicted) << '\n';
+	std::cout << std::get<0>(predicted) << '\n';
+	std::cout << std::get<1>(predicted) << '\n';
+	std::cout << outputs << '\n';
 
 	tm_end = std::chrono::system_clock::now();
 
@@ -483,7 +536,7 @@ int ResNet::loadnet(const char* szPreTrainSetStateFilePath)
 	NN_TYPE nn_type = nntype_from_options();
 	int64_t NN_enable_batch_norm = int64_from_options("NN::enable_batch_norm");
 	int64_t NN_final_out_classes = int64_from_options("NN::final_out_classes");
-	int64_t NN_use_32x32_input = int64_from_options("NN::use_32x32_input");
+	int64_t NN_use_32x32_input = int64_from_options("NN::use_32x32_input", 0);
 
 	// if the pre-trained neutral network state file is not specified
 	RESNET_CONFIG config = RESNET_UNKNOWN;
@@ -509,8 +562,44 @@ int ResNet::loadnet(const char* szPreTrainSetStateFilePath)
 		m_use_32x32_input = NN_use_32x32_input ? true : false;
 
 		m_imageprocessor.Init(m_use_32x32_input ? 32 : RESNET_INPUT_IMG_WIDTH, m_use_32x32_input ? 32 : RESNET_INPUT_IMG_HEIGHT);
+		
+		int iRet = -1;
+		if ((iRet = _Init()) == 0)
+		{
+			for (auto& m : modules(false))
+			{
+				if (m->name() == "torch::nn::Conv2dImpl")
+				{
+					printf("init the conv2d parameters.\n");
+					auto spConv2d = std::dynamic_pointer_cast<torch::nn::Conv2dImpl>(m);
+					//torch::nn::init::xavier_normal_(spConv2d->weight);
+					torch::nn::init::kaiming_normal_(spConv2d->weight, 0.0, torch::kFanOut, torch::kReLU);
+					//torch::nn::init::constant_(spConv2d->weight, 1);
+				}
+				else if (m->name() == "torch::nn::BatchNorm2dImpl")
+				{
+					printf("init the batchnorm2d parameters.\n");
+					auto spBatchNorm2d = std::dynamic_pointer_cast<torch::nn::BatchNorm2dImpl>(m);
+					torch::nn::init::constant_(spBatchNorm2d->weight, 1);
+					torch::nn::init::constant_(spBatchNorm2d->bias, 0);
+				}
+				//else if (m->name() == "torch::nn::LinearImpl")
+				//{
+				//	auto spLinear = std::dynamic_pointer_cast<torch::nn::LinearImpl>(m);
+				//	torch::nn::init::constant_(spLinear->weight, 1);
+				//	torch::nn::init::constant_(spLinear->bias, 0);
+				//}
+			}
 
-		return _Init();
+			//torch::Tensor a = torch::eye(64);
+			//torch::Tensor c = torch::stack({ a, a, a });
+			//c = c.unsqueeze(0);
+			////std::cout << c << '\n';
+			//c = forward(c);
+			//std::cout << c << '\n';
+			//abort();
+		}
+		return iRet;
 	}
 
 	try
@@ -576,13 +665,16 @@ int ResNet::loadnet(const char* szPreTrainSetStateFilePath)
 		// Construct network layout,weight layers and so on
 		if (_Init() < 0)
 		{
-			printf("Failed to initialize the current network {num_of_classes: %d, VGG config: %d, use_32x32_input: %s}.\n",
+			printf("Failed to initialize the current network {num_of_classes: %d, RESNET config: %d, use_32x32_input: %s}.\n",
 				m_num_classes, m_RESNET_config, m_use_32x32_input ? "yes" : "no");
 			return -1;
 		}
 
 		// Load the network state into the constructed neutral network
 		load(archive);
+		//for (auto const& p : named_parameters())
+		//	std::cout << p.key() << ":\n" << p.value() << '\n';
+
 	}
 	catch (...)
 	{
