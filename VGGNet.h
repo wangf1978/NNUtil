@@ -62,7 +62,7 @@ public:
 						double weight_decay = NAN,
 						double momentum = NAN,
 						OPTIM_TYPE optim_type = OPTIM_SGD);
-	void			verify(const char* szTrainSetRootPath);
+	void			verify(const char* szTrainSetRootPath, IMGSET_TYPE img_type);
 	void			classify(const char* szImageFile);
 
 	//

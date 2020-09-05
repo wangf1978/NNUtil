@@ -1490,6 +1490,8 @@ HRESULT ImageProcess::loadImageSet(
 
 	if (imgset_type == IMGSET_FOLDER)
 	{
+		image_labels.clear();
+		m_image_files.clear();
 		if (FAILED(loadImageSet(szImageSetRootPath, m_image_files, image_labels, bTrainSet, bShuffle)))
 		{
 			_tprintf(_T("Failed to load the image labels from the path '%s'.\n"), szImageSetRootPath);
@@ -1497,6 +1499,7 @@ HRESULT ImageProcess::loadImageSet(
 		}
 
 		number_of_imgs = (int)m_image_files.size();
+		m_image_labels = image_labels;
 	}
 	else if (imgset_type == IMGSET_MNIST)
 	{
@@ -1515,6 +1518,7 @@ HRESULT ImageProcess::loadImageSet(
 		}
 
 		number_of_imgs = MNIST_info.num_of_images;
+		m_image_labels = image_labels;
 	}
 	else if (imgset_type == IMGSET_CIFAR_10)
 	{
@@ -1603,6 +1607,8 @@ HRESULT ImageProcess::nextImageSetBatchIter(torch::Tensor& tensor, std::vector<i
 		std::vector<tstring> image_batches;
 
 		m_imageset_iter_pos++;
+		labels.clear();
+		coarse_labels.clear();
 
 		while (image_batches.size() < batch_size)
 		{

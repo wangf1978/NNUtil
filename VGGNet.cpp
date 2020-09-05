@@ -297,7 +297,7 @@ int VGGNet::train(const char* szImageSetRootPath,
 	return 0;
 }
 
-void VGGNet::verify(const char* szImageSetRootPath)
+void VGGNet::verify(const char* szImageSetRootPath, IMGSET_TYPE img_type)
 {
 	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name with the format 'classname/picture_file_name'
@@ -342,15 +342,9 @@ void VGGNet::verify(const char* szImageSetRootPath)
 		std::shuffle(test_image_shuffle_set.begin(), test_image_shuffle_set.end(), g);
 	}
 
-	tm_end = std::chrono::system_clock::now();
-	printf("It took %lld msec to load the test images/labels set.\n", 
-		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
-	tm_start = std::chrono::system_clock::now();
+	torch::NoGradGuard no_grade;
 
-	tm_end = std::chrono::system_clock::now();
-	printf("It took %lld msec to load the pre-trained network state.\n", 
-		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
-	tm_start = std::chrono::system_clock::now();
+	eval();
 
 	torch::Tensor tensor_input;
 	int total_test_items = 0, passed_test_items = 0;
@@ -382,9 +376,6 @@ void VGGNet::verify(const char* szImageSetRootPath)
 
 		// Label在这里必须是一阶向量，里面元素必须是整数类型
 		torch::Tensor tensor_label = torch::tensor({ (int64_t)label });
-
-		//std::cout << "tensor_input.sizes:" << tensor_input.sizes() << '\n';
-		//std::cout << "tensor_label.sizes:" << tensor_label.sizes() << '\n';
 
 		auto outputs = forward(tensor_input);
 		auto predicted = torch::max(outputs, 1);
@@ -435,6 +426,10 @@ void VGGNet::classify(const char* cszImageFile)
 		printf("Failed to convert the image to tensor.\n");
 		return;
 	}
+
+	torch::NoGradGuard no_grade;
+
+	eval();
 
 	auto outputs = forward(tensor_input);
 	auto predicted = torch::max(outputs, 1);

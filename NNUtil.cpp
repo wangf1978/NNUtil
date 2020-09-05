@@ -891,7 +891,7 @@ int _tmain(int argc, const TCHAR* argv[])
 			}
 		}
 
-		ptrNet->verify(ctxCmd.image_set_root_path.c_str());
+		ptrNet->verify(ctxCmd.image_set_root_path.c_str(), ctxCmd.imgset_type);
 	}
 	break;
 	case NN_CMD_CLASSIFY:

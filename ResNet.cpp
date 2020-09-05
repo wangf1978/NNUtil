@@ -98,12 +98,14 @@ int ResNet::train(const char* szImageSetRootPath,
 	// store the file name classname/picture_file_name
 	std::vector<tstring> train_image_files;
 	std::vector<tstring> train_image_labels;
+	std::vector<tstring> train_image_coarse_labels;
+	int num_of_images = 0;
+
 	std::vector<size_t> train_image_shuffle_set;
 	auto tm_start = std::chrono::system_clock::now();
 	auto tm_end = tm_start;
-	TCHAR szDirPath[MAX_PATH] = { 0 };
-	TCHAR* tszImageSetRootPath = NULL;
 
+	TCHAR* tszImageSetRootPath = NULL;
 	// Convert UTF-8 to Unicode
 #ifdef _UNICODE
 	wchar_t wszImageSetRootPath[MAX_PATH + 1] = { 0 };
@@ -113,21 +115,16 @@ int ResNet::train(const char* szImageSetRootPath,
 	tszImageSetRootPath = szImageSetRootPath;
 #endif
 
-	_tcscpy_s(szDirPath, MAX_PATH, tszImageSetRootPath);
-	size_t ccDirPath = _tcslen(tszImageSetRootPath);
-	if (szDirPath[ccDirPath - 1] == _T('\\'))
-		szDirPath[ccDirPath - 1] = _T('\0');
+	batch_size = batch_size < 0 ? 1 : batch_size;
 
-	if (FAILED(m_imageprocessor.loadImageSet(tszImageSetRootPath,
-		train_image_files, train_image_labels, true)))
+	HRESULT hr = m_imageprocessor.loadImageSet(img_type, tszImageSetRootPath, train_image_labels, train_image_coarse_labels, num_of_images, batch_size);
+	if (FAILED(hr))
 	{
-		printf("Failed to load the train image/label set.\n");
+		printf("Failed to load the image set.\n");
 		return -1;
 	}
 
 	m_imageprocessor.SetImageTransformMode((ImageTransformMode)(/*IMG_TM_PADDING_RESIZE | */IMG_TM_RANDOM_CROP | IMG_TM_CENTER_CROP | IMG_TM_RANDOM_HORIZONTAL_FLIPPING));
-
-	batch_size = batch_size < 0 ? 1 : batch_size;
 
 	double lr = pLRMgr->GetLearningRate();
 	double wd = isnan(weight_decay) ? RESNET_DEFAULT_WEIGHT_DECAY : (double)weight_decay;
@@ -144,7 +141,7 @@ int ResNet::train(const char* szImageSetRootPath,
 	printf("optimizer: %s\n", OPTIM_NAME(optim_type));
 	printf("weight decay: %s\n", doublecompactstring(wd).c_str());
 	printf("momentum: %s\n", doublecompactstring(m).c_str());
-	printf("learning rate: %s\n", doublecompactstring(pLRMgr->GetLearningRate()).c_str());
+	printf("learning rate: %s\n", doublecompactstring(lr).c_str());
 	printf("batch size: %d\n", batch_size);
 	printf("=======================================================================\n");
 
@@ -154,9 +151,6 @@ int ResNet::train(const char* szImageSetRootPath,
 		optimizer = new torch::optim::Adam(parameters(), torch::optim::AdamOptions(lr).weight_decay(wd));
 	else
 		optimizer = new torch::optim::SGD(parameters(), torch::optim::SGDOptions(lr).momentum(m).weight_decay(wd));
-	tm_end = std::chrono::system_clock::now();
-	printf("It takes %lld msec to prepare training classifying cats and dogs.\n",
-		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
 
 	tm_start = std::chrono::system_clock::now();
 
@@ -165,26 +159,17 @@ int ResNet::train(const char* szImageSetRootPath,
 	{
 		auto running_loss = 0.;
 		auto epoch_loss = 0.;
-		size_t totals = 0;
+		auto correct = 0.;
+		auto total = 0.;
+		size_t nBatchProcessed = 0;
+		std::vector<long long> label_batches;
+		std::vector<long long> coarse_label_batches;
 
-		// Shuffle the list
-		if (train_image_files.size() > 0)
-		{
-			// generate the shuffle list to train
-			train_image_shuffle_set.resize(train_image_files.size());
-			for (size_t i = 0; i < train_image_files.size(); i++)
-				train_image_shuffle_set[i] = i;
-			std::random_device rd;
-			std::mt19937_64 g(rd());
-			std::shuffle(train_image_shuffle_set.begin(), train_image_shuffle_set.end(), g);
-		}
+		m_imageprocessor.initImageSetBatchIter();
 
 		// Take the image shuffle
-		for (size_t i = 0; i < (train_image_shuffle_set.size() + batch_size - 1) / batch_size; i++)
+		while(SUCCEEDED(m_imageprocessor.nextImageSetBatchIter(tensor_input, label_batches, coarse_label_batches)))
 		{
-			std::vector<ResNet::tstring> image_batches;
-			std::vector<long long> label_batches;
-
 			// dynamic learning rate if no learning rate is specified
 			if (lr != pLRMgr->GetLearningRate())
 			{
@@ -224,60 +209,19 @@ int ResNet::train(const char* szImageSetRootPath,
 				}
 			}
 
-			for (int b = 0; b < batch_size; b++)
-			{
-				size_t idx = i * batch_size + b;
-				if (idx >= train_image_shuffle_set.size())
-					break;
-
-				tstring& strImgFilePath = train_image_files[train_image_shuffle_set[idx]];
-				const TCHAR* cszImgFilePath = strImgFilePath.c_str();
-				const TCHAR* pszTmp = _tcschr(cszImgFilePath, _T('\\'));
-
-				if (pszTmp == NULL)
-					continue;
-
-				size_t label = 0;
-				for (label = 0; label < train_image_labels.size(); label++)
-					if (_tcsnicmp(train_image_labels[label].c_str(), cszImgFilePath,
-						(pszTmp - cszImgFilePath) / sizeof(TCHAR)) == 0)
-						break;
-
-				if (label >= train_image_labels.size())
-					continue;
-
-				_stprintf_s(szImageFile, _T("%s\\training_set\\%s"), szDirPath, cszImgFilePath);
-
-				image_batches.push_back(szImageFile);
-				label_batches.push_back((long long)label);
-
-				//_tprintf(_T("now training %s for the file: %s.\n"), 
-				//	train_image_labels[label].c_str(), szImageFile);
-			}
-
-			if (image_batches.size() == 0)
-				continue;
-
-			if (m_imageprocessor.ToTensor(image_batches, tensor_input) != 0)
+			if (label_batches.size() == 0)
 				continue;
 
 			// Label在这里必须是一阶向量，里面元素必须是整数类型
 			torch::Tensor tensor_label = torch::tensor(label_batches);
-			//tensor_label = tensor_label.view({ 1, -1 });
-
-			totals += label_batches.size();
 
 			optimizer->zero_grad();
 			// 喂数据给网络
 			auto outputs = forward(tensor_input);
 
-			//std::cout << "tensor_label:" << tensor_label << "\noutputs.sizes(): " << outputs << '\n';
-
-			//std::cout << outputs << '\n';
-			//std::cout << tensor_label << '\n';
-
 			// 通过交叉熵计算损失
 			auto loss = criterion(outputs, tensor_label);
+			auto predicted = std::get<1>(torch::max(outputs, 1));
 			// 反馈给网络，调整权重参数进一步优化
 			loss.backward();
 			optimizer->step();
@@ -285,20 +229,25 @@ int ResNet::train(const char* szImageSetRootPath,
 			running_loss += loss.item().toFloat();
 			epoch_loss += loss.item().toFloat();
 
+			total += tensor_label.size(0);
+			correct += predicted.eq(tensor_label).sum().item().toFloat();
+
 			pLRMgr->OnTrainStepFinish(loss.item().toFloat());
+
+			nBatchProcessed++;
 
 			if (showloss_per_num_of_batches > 0)
 			{
-				if (((i + 1) % showloss_per_num_of_batches == 0))
+				if ((nBatchProcessed % showloss_per_num_of_batches) == 0)
 				{
-					printf("[%lld, %5zu] loss: %.3f epoch loss: %.3f\n", epoch, i + 1,
-						running_loss / showloss_per_num_of_batches, epoch_loss / (i + 1));
+					printf("[%lld, %5zu] Loss: %.3f epoch Loss: %.3f | Acc: %.3f%%\n", epoch, nBatchProcessed,
+						running_loss / showloss_per_num_of_batches, epoch_loss / nBatchProcessed, 100.*correct / total);
 					running_loss = 0.;
 				}
-				else if (i + 1 == (train_image_shuffle_set.size() + batch_size - 1) / batch_size)
+				else if (nBatchProcessed == (train_image_shuffle_set.size() + batch_size - 1) / batch_size)
 				{
-					printf("[%lld, %5zu] loss: %.3f epoch loss: %.3f\n", epoch, i + 1,
-						running_loss / ((i + 1) % showloss_per_num_of_batches), epoch_loss / (i + 1));
+					printf("[%lld, %5zu] Loss: %.3f epoch Loss: %.3f | Acc: %.3f%%\n", epoch, nBatchProcessed,
+						running_loss / (nBatchProcessed % showloss_per_num_of_batches), epoch_loss / nBatchProcessed, 100.*correct / total);
 					running_loss = 0.;
 				}
 			}
@@ -326,18 +275,20 @@ int ResNet::train(const char* szImageSetRootPath,
 	return 0;
 }
 
-void ResNet::verify(const char* szImageSetRootPath)
+void ResNet::verify(const char* szImageSetRootPath, IMGSET_TYPE img_type)
 {
 	TCHAR szImageFile[MAX_PATH] = { 0 };
 	// store the file name with the format 'classname/picture_file_name'
-	std::vector<tstring> test_image_files;
-	std::vector<tstring> test_image_labels;
-	std::vector<size_t> test_image_shuffle_set;
+	std::vector<tstring> train_image_files;
+	std::vector<tstring> train_image_labels;
+	std::vector<tstring> train_image_coarse_labels;
+	int num_of_images = 0;
+
 	auto tm_start = std::chrono::system_clock::now();
 	auto tm_end = tm_start;
 	TCHAR szDirPath[MAX_PATH] = { 0 };
-	TCHAR* tszImageSetRootPath = NULL;
 
+	TCHAR* tszImageSetRootPath = NULL;
 	// Convert UTF-8 to Unicode
 #ifdef _UNICODE
 	wchar_t wszImageSetRootPath[MAX_PATH + 1] = { 0 };
@@ -347,96 +298,50 @@ void ResNet::verify(const char* szImageSetRootPath)
 	tszImageSetRootPath = szImageSetRootPath;
 #endif
 
-	_tcscpy_s(szDirPath, MAX_PATH, tszImageSetRootPath);
-	size_t ccDirPath = _tcslen(tszImageSetRootPath);
-	if (szDirPath[ccDirPath - 1] == _T('\\'))
-		szDirPath[ccDirPath - 1] = _T('\0');
-
-	if (FAILED(m_imageprocessor.loadImageSet(tszImageSetRootPath,
-		test_image_files, test_image_labels, false)))
+	HRESULT hr = m_imageprocessor.loadImageSet(img_type, tszImageSetRootPath, train_image_labels, train_image_coarse_labels, num_of_images, 1, false, false);
+	if (FAILED(hr))
 	{
-		printf("Failed to load the test image/label sets.\n");
+		printf("Failed to load the image set.\n");
 		return;
 	}
 
-	// Shuffle the list
-	if (test_image_files.size() > 0)
-	{
-		// generate the shuffle list to train
-		test_image_shuffle_set.resize(test_image_files.size());
-		for (size_t i = 0; i < test_image_files.size(); i++)
-			test_image_shuffle_set[i] = i;
-		std::random_device rd;
-		std::mt19937_64 g(rd());
-		std::shuffle(test_image_shuffle_set.begin(), test_image_shuffle_set.end(), g);
-	}
+	std::vector<long long> label_batches;
+	std::vector<long long> coarse_label_batches;
 
-	if (m_image_labels.size() == 0)
-		m_image_labels = test_image_labels;
+	m_imageprocessor.initImageSetBatchIter();
 
-	tm_end = std::chrono::system_clock::now();
-	printf("It took %lld msec to load the test images/labels set.\n",
-		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
-	tm_start = std::chrono::system_clock::now();
+	torch::NoGradGuard no_grade;
 
-	tm_end = std::chrono::system_clock::now();
-	printf("It took %lld msec to load the pre-trained network state.\n",
-		std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count());
-	tm_start = std::chrono::system_clock::now();
+	eval();
 
 	torch::Tensor tensor_input;
 	int total_test_items = 0, passed_test_items = 0;
-	for (size_t i = 0; i < test_image_shuffle_set.size(); i++)
+	// Take the image shuffle
+	while (SUCCEEDED(m_imageprocessor.nextImageSetBatchIter(tensor_input, label_batches, coarse_label_batches)))
 	{
-		tstring& strImgFilePath = test_image_files[test_image_shuffle_set[i]];
-		const TCHAR* cszImgFilePath = strImgFilePath.c_str();
-		const TCHAR* pszTmp = _tcschr(cszImgFilePath, _T('\\'));
-
-		if (pszTmp == NULL)
-			continue;
-
-		size_t label = 0;
-		for (label = 0; label < m_image_labels.size(); label++)
-			if (_tcsnicmp(m_image_labels[label].c_str(),
-				cszImgFilePath, (pszTmp - cszImgFilePath) / sizeof(TCHAR)) == 0)
-				break;
-
-		if (label >= m_image_labels.size())
-		{
-			tstring strUnmatchedLabel(cszImgFilePath, (pszTmp - cszImgFilePath) / sizeof(TCHAR));
-			_tprintf(_T("Can't find the test label: %s\n"), strUnmatchedLabel.c_str());
-			continue;
-		}
-
-		_stprintf_s(szImageFile, _T("%s\\test_set\\%s"), szDirPath, cszImgFilePath);
-		if (m_imageprocessor.ToTensor(szImageFile, tensor_input) != 0)
-			continue;
-
 		// Label在这里必须是一阶向量，里面元素必须是整数类型
-		torch::Tensor tensor_label = torch::tensor({ (int64_t)label });
-
-		//std::cout << "tensor_input.sizes:" << tensor_input.sizes() << '\n';
-		//std::cout << "tensor_label.sizes:" << tensor_label.sizes() << '\n';
+		torch::Tensor tensor_label = torch::tensor(label_batches);
 
 		auto outputs = forward(tensor_input);
 		auto predicted = torch::max(outputs, 1);
+		auto predicted_labels = std::get<1>(predicted);
 
-		auto predicted_label = std::get<1>(predicted).item<int>();
-		_tprintf(_T("predicted: %s, fact: %s --> file: %s.\n"),
-			predicted_label >= 0 && predicted_label < m_image_labels.size() ? m_image_labels[predicted_label].c_str() : _T("Unknown"),
-			m_image_labels[tensor_label[0].item<int>()].c_str(), szImageFile);
+		for (int64_t i = 0; i < predicted_labels.size(0); i++)
+		{
+			int predict_label = predicted_labels[i].item<int>();
+			int fact_label = tensor_label[i].item<int>();
 
-		if (tensor_label[0].item<int>() == std::get<1>(predicted).item<int>())
-			passed_test_items++;
+			_tprintf(_T("predicted: %s, fact: %s.\n"),
+				predict_label >= 0 && predict_label < m_image_labels.size() ? m_image_labels[predict_label].c_str() : _T("Unknown"),
+				m_image_labels[tensor_label[i].item<int>()].c_str());
 
-		total_test_items++;
+			if (fact_label == predict_label)
+				passed_test_items++;
 
-		//printf("label: %d.\n", tensor_label[0].item<int>());
-		//printf("predicted label: %d.\n", std::get<1>(predicted).item<int>());
-		//std::cout << std::get<1>(predicted) << '\n';
-
-		//break;
+			total_test_items++;
+		}
 	}
+
 	tm_end = std::chrono::system_clock::now();
 
 	long long verify_duration = std::chrono::duration_cast<std::chrono::milliseconds>(tm_end - tm_start).count();
@@ -515,6 +420,8 @@ int ResNet::savenet(const char* szTrainSetStateFilePath)
 		torch::IValue valUseSmallSize(m_use_32x32_input);
 		archive.write("RESNET_use_32x32_input", valUseSmallSize);
 
+		// save the learning rate configuration
+
 		save(archive);
 
 		archive.save_to(szTrainSetStateFilePath);
@@ -566,6 +473,7 @@ int ResNet::loadnet(const char* szPreTrainSetStateFilePath)
 		int iRet = -1;
 		if ((iRet = _Init()) == 0)
 		{
+#if 0
 			for (auto& m : modules(false))
 			{
 				if (m->name() == "torch::nn::Conv2dImpl")
@@ -598,6 +506,7 @@ int ResNet::loadnet(const char* szPreTrainSetStateFilePath)
 			//c = forward(c);
 			//std::cout << c << '\n';
 			//abort();
+#endif
 		}
 		return iRet;
 	}
